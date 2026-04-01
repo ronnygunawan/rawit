@@ -4,14 +4,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>rg.projectrawit</groupId>
-    <artifactId>rg-projectrawit</artifactId>
+    <groupId>rg.rawit</groupId>
+    <artifactId>rg-rawit</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <!-- Required metadata for Maven Central -->
-    <name>Project Rawit</name>
+    <name>Rawit</name>
     <description>Compile-time staged invocation API via @Curry and @Constructor annotation processors</description>
-    <url>https://github.com/projectrawit/rg-projectrawit</url>
+    <url>https://github.com/ronnygunawan/rawit</url>
 
     <licenses>
         <license>
@@ -22,16 +22,16 @@
 
     <developers>
         <developer>
-            <id>projectrawit</id>
-            <name>Project Rawit</name>
-            <url>https://github.com/projectrawit</url>
+            <id>ronnygunawan</id>
+            <name>Ronny Gunawan</name>
+            <url>https://github.com/ronnygunawan</url>
         </developer>
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/projectrawit/rg-projectrawit.git</connection>
-        <developerConnection>scm:git:ssh://github.com/projectrawit/rg-projectrawit.git</developerConnection>
-        <url>https://github.com/projectrawit/rg-projectrawit</url>
+        <connection>scm:git:git://github.com/ronnygunawan/rawit.git</connection>
+        <developerConnection>scm:git:ssh://github.com/ronnygunawan/rawit.git</developerConnection>
+        <url>https://github.com/ronnygunawan/rawit</url>
     </scm>
 
     <properties>
