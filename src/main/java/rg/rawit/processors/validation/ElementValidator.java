@@ -1,7 +1,7 @@
 package rg.rawit.processors.validation;
 
 import rg.rawit.Constructor;
-import rg.rawit.Curry;
+import rg.rawit.Invoker;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
@@ -10,7 +10,7 @@ import javax.tools.Diagnostic;
 import java.util.List;
 
 /**
- * Validates elements annotated with {@code @Curry} or {@code @Constructor}.
+ * Validates elements annotated with {@code @Invoker} or {@code @Constructor}.
  *
  * <p>All violated rules are emitted as {@link Diagnostic.Kind#ERROR} messages via the
  * supplied {@link Messager}. The validator checks ALL applicable rules (no short-circuit),
@@ -24,17 +24,17 @@ public class ElementValidator {
     /**
      * Validates the given annotated element and emits diagnostics for every violated rule.
      *
-     * @param element  the element carrying {@code @Curry} or {@code @Constructor}
+     * @param element  the element carrying {@code @Invoker} or {@code @Constructor}
      * @param messager the compiler messager used to emit diagnostics
      * @return {@link ValidationResult#valid()} if all rules pass,
      *         {@link ValidationResult#invalid()} if any rule was violated
      */
     public ValidationResult validate(final Element element, final Messager messager) {
-        final boolean hasCurry = element.getAnnotation(Curry.class) != null;
+        final boolean hasInvoker = element.getAnnotation(Invoker.class) != null;
         final boolean hasConstructor = element.getAnnotation(Constructor.class) != null;
 
-        if (hasCurry) {
-            return validateCurry(element, messager);
+        if (hasInvoker) {
+            return validateInvoker(element, messager);
         } else if (hasConstructor) {
             return validateConstructor(element, messager);
         }
@@ -44,10 +44,10 @@ public class ElementValidator {
     }
 
     // -------------------------------------------------------------------------
-    // @Curry validation
+    // @Invoker validation
     // -------------------------------------------------------------------------
 
-    private ValidationResult validateCurry(final Element element, final Messager messager) {
+    private ValidationResult validateInvoker(final Element element, final Messager messager) {
         boolean hasError = false;
 
         // Requirement 1.1 / 2.1 — must be METHOD or CONSTRUCTOR
@@ -55,7 +55,7 @@ public class ElementValidator {
         if (kind != ElementKind.METHOD && kind != ElementKind.CONSTRUCTOR) {
             messager.printMessage(
                     Diagnostic.Kind.ERROR,
-                    "@Curry may only target methods or constructors",
+                    "@Invoker may only target methods or constructors",
                     element);
             // Cannot proceed with further checks if the element is not executable
             return ValidationResult.invalid();
@@ -67,7 +67,7 @@ public class ElementValidator {
         if (exec.getParameters().isEmpty()) {
             messager.printMessage(
                     Diagnostic.Kind.ERROR,
-                    "currying requires at least one parameter",
+                    "@Invoker requires at least one parameter",
                     element);
             hasError = true;
         }
@@ -76,14 +76,14 @@ public class ElementValidator {
         if (exec.getModifiers().contains(Modifier.PRIVATE)) {
             messager.printMessage(
                     Diagnostic.Kind.ERROR,
-                    "@Curry requires at least package-private visibility",
+                    "@Invoker requires at least package-private visibility",
                     element);
             hasError = true;
         }
 
         // Requirement 3.7 / 13.1 — no existing zero-param overload with the same name
         if (hasConflictingOverload(exec)) {
-            final String overloadName = resolvedCurryOverloadName(exec);
+            final String overloadName = resolvedInvokerOverloadName(exec);
             messager.printMessage(
                     Diagnostic.Kind.ERROR,
                     "a parameterless overload named '" + overloadName + "' already exists on this class",
@@ -151,7 +151,7 @@ public class ElementValidator {
     /**
      * Returns {@code true} when the enclosing type already declares a zero-parameter method
      * whose name matches the parameterless overload that would be injected for this
-     * {@code @Curry}-annotated element.
+     * {@code @Invoker}-annotated element.
      *
      * <ul>
      *   <li>For a regular method {@code bar}, the overload name is {@code "bar"}.</li>
@@ -160,7 +160,7 @@ public class ElementValidator {
      * </ul>
      */
     private boolean hasConflictingOverload(final ExecutableElement exec) {
-        final String overloadName = resolvedCurryOverloadName(exec);
+        final String overloadName = resolvedInvokerOverloadName(exec);
         return enclosingTypeHasZeroParamMethod(exec, overloadName);
     }
 
@@ -198,14 +198,14 @@ public class ElementValidator {
 
     /**
      * Resolves the name of the parameterless overload that would be injected for a
-     * {@code @Curry}-annotated element.
+     * {@code @Invoker}-annotated element.
      *
      * <ul>
      *   <li>Regular method → the method's own simple name.</li>
      *   <li>Constructor → the enclosing class name lowercased (Requirement 3.6).</li>
      * </ul>
      */
-    private String resolvedCurryOverloadName(final ExecutableElement exec) {
+    private String resolvedInvokerOverloadName(final ExecutableElement exec) {
         if (exec.getKind() == ElementKind.CONSTRUCTOR) {
             final Element enclosing = exec.getEnclosingElement();
             return enclosing.getSimpleName().toString().toLowerCase();

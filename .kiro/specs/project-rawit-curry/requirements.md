@@ -3,36 +3,20 @@
 ## Introduction
 
 Project Rawit is an open source Java annotation processor library (Java 21, Maven) that provides
-compile-time staged-invocation APIs via two annotations: `@Curry` and `@Constructor`. The processor
+compile-time staged-invocation APIs via two annotations: `@Invoker` and `@Constructor`. The processor
 works like Lombok: it manipulates the *original* class's `.class` file in the build output folder
 rather than generating a separate companion class.
 
-When `@Curry` is placed on a method `bar(int x, int y)` in class `Foo`, the processor injects into
+When `@Invoker` is placed on a method `bar(int x, int y)` in class `Foo`, the processor injects into
 `Foo`'s bytecode:
 
-- A parameterless overload `bar()` that returns the first stage interface (`Foo.Bar.XStageCaller`).
-- An inner class `Foo.Bar` that implements all stage interfaces and holds the accumulated arguments.
-- A set of stage interfaces nested inside `Foo.Bar`, one per parameter, each named after the
-  parameter (e.g. `XStageCaller`, `YStageCaller`). Each stage interface exposes a single method
+- A parameterless overload `bar()` that returns the first stage interface (`Bar.XStageInvoker`).
+- A top-level class `Bar` (in the same package as `Foo`) that implements all stage interfaces and
+  holds the accumulated arguments.
+- A set of stage interfaces nested inside `Bar`, one per parameter, each named after the
+  parameter (e.g. `XStageInvoker`, `YStageInvoker`). Each stage interface exposes a single method
   named after the parameter (e.g. `x(int x)`) that returns the next stage interface. The last
-  stage's method returns an `InvokeStageCaller` whose `invoke()` method calls the original
-  annotated method and returns its result.
-
-Usage after annotation processing:
-
-```java
-foo.bar().x(10).y(20).invoke();
-```
-
-When `@Constructor` is placed on a constructor `Foo(int id, String name)`, the processor injects
-into `Foo`'s bytecode:
-
-- A parameterless overload `bar()` that returns the first stage interface (`Foo.Bar.XStageCaller`).
-- An inner class `Foo.Bar` that implements all stage interfaces and holds the accumulated arguments.
-- A set of stage interfaces nested inside `Foo.Bar`, one per parameter, each named after the
-  parameter (e.g. `XStageCaller`, `YStageCaller`). Each stage interface exposes a single method
-  named after the parameter (e.g. `x(int x)`) that returns the next stage interface. The last
-  stage's method returns an `InvokeStageCaller` whose `invoke()` method calls the original
+  stage's method returns an `InvokeStageInvoker` whose `invoke()` method calls the original
   annotated method and returns its result.
 
 Usage after annotation processing:
@@ -45,12 +29,12 @@ When `@Constructor` is placed on a constructor `Foo(int id, String name)`, the p
 into `Foo`'s bytecode:
 
 - A `public static` method `constructor()` that returns the first stage interface
-  (`Foo.Constructor.IdStageConstructor`).
-- An inner class `Foo.Constructor` that implements all stage interfaces and holds the accumulated
-  arguments.
-- A set of stage interfaces nested inside `Foo.Constructor`, one per parameter, each named
+  (`Constructor.IdStageConstructor`).
+- A top-level class `Constructor` (in the same package as `Foo`) that implements all stage
+  interfaces and holds the accumulated arguments.
+- A set of stage interfaces nested inside `Constructor`, one per parameter, each named
   `<ParameterName>StageConstructor` in PascalCase (e.g. `IdStageConstructor`,
-  `NameStageConstructor`). The last stage's method returns a `ConstructStageCaller` whose
+  `NameStageConstructor`). The last stage's method returns a `ConstructStageInvoker` whose
   `construct()` method calls `new Foo(...)` and returns the new instance.
 
 Usage after annotation processing:
@@ -63,29 +47,29 @@ The pattern works for both instance methods and static methods, as well as const
 
 ## Glossary
 
-- **Curry_Annotation**: The `@rawit.Curry` source-retention annotation placed on a method or constructor.
-- **Annotated_Element**: The method or constructor carrying `@Curry`.
+- **Invoker_Annotation**: The `@rawit.Invoker` source-retention annotation placed on a method or constructor.
+- **Annotated_Element**: The method or constructor carrying `@Invoker`.
 - **Processor**: The `RawitAnnotationProcessor` that runs during `javac` compilation and drives bytecode manipulation.
 - **Bytecode_Manipulator**: The component (e.g. ASM or Javassist) that modifies the original `.class` file in the build output directory.
-- **Caller_Class**: The generated inner class (e.g. `Foo.Bar` for method `bar`) injected into the enclosing class's bytecode. It implements all Stage_Interfaces and accumulates arguments.
-- **Stage_Interface**: A generated single-method interface nested inside the Caller_Class, named `<ParameterName>StageCaller` (e.g. `XStageCaller`). One Stage_Interface is created per parameter.
-- **Stage_Method**: The single method on a Stage_Interface, named after the parameter (e.g. `x(int x)`). It returns the next Stage_Interface, or the InvokeStageCaller for the last stage.
-- **Parameterless_Overload**: The zero-argument method injected into the original class that starts the curried chain by returning the first Stage_Interface.
+- **Caller_Class**: The generated top-level class (e.g. `Bar` for method `bar`) in the same package as the enclosing class. It implements all Stage_Interfaces and accumulates arguments.
+- **Stage_Interface**: A generated single-method interface nested inside the Caller_Class, named `<ParameterName>StageInvoker` (e.g. `XStageInvoker`). One Stage_Interface is created per parameter.
+- **Stage_Method**: The single method on a Stage_Interface, named after the parameter (e.g. `x(int x)`). It returns the next Stage_Interface, or the InvokeStageInvoker for the last stage.
+- **Parameterless_Overload**: The zero-argument method injected into the original class that starts the staged invocation chain by returning the first Stage_Interface.
 - **Entry_Stage**: The first Stage_Interface in the chain, returned by the Parameterless_Overload.
 - **Final_Result**: The return type of the Annotated_Element (or the enclosing class type for constructors). For `void` methods `invoke()` also returns `void`.
-- **InvokeStageCaller**: A generated interface with a single zero-argument method `invoke()` that calls the original Annotated_Element with all accumulated arguments and returns the Final_Result. The last Stage_Method in every chain returns an InvokeStageCaller rather than the Final_Result directly.
-- **Chain**: The ordered sequence of Stage_Interfaces, one per parameter of the Annotated_Element, terminating in an InvokeStageCaller.
-- **Overload_Group**: The set of all `@Curry`-annotated methods in the same class that share the same method name.
+- **InvokeStageInvoker**: A generated interface with a single zero-argument method `invoke()` that calls the original Annotated_Element with all accumulated arguments and returns the Final_Result. The last Stage_Method in every chain returns an InvokeStageInvoker rather than the Final_Result directly.
+- **Chain**: The ordered sequence of Stage_Interfaces, one per parameter of the Annotated_Element, terminating in an InvokeStageInvoker.
+- **Overload_Group**: The set of all `@Invoker`-annotated methods in the same class that share the same method name.
 - **Shared_Prefix**: The longest leading sequence of parameters (by position) across all overloads in an Overload_Group where every overload agrees on both the parameter name and type.
 - **Branching_Stage**: A Stage_Interface generated at the point where an Overload_Group diverges; it exposes one Stage_Method per distinct next-parameter variant rather than a single Stage_Method.
 - **Prefix_Overload**: An overload whose full parameter list is a strict prefix of another overload in the same Overload_Group (same names and types up to the shorter length).
-- **Invoke_Method**: The zero-argument `invoke()` method on an InvokeStageCaller that calls the Annotated_Element and returns its result.
+- **Invoke_Method**: The zero-argument `invoke()` method on an InvokeStageInvoker that calls the Annotated_Element and returns its result.
 - **Round**: A single pass of annotation processing performed by `javac`.
 - **Processing_Environment**: The `javax.annotation.processing.ProcessingEnvironment` provided to the Processor at init time.
 - **Constructor_Annotation**: The `@rawit.Constructor` source-retention annotation placed on a constructor.
-- **Constructor_Caller_Class**: The generated `public static` inner class named `Constructor` injected into the enclosing class's bytecode. It implements all StageConstructor_Interfaces and accumulates arguments for the constructor call.
+- **Constructor_Caller_Class**: The generated top-level class named `Constructor` (in the same package as the enclosing class). It implements all StageConstructor_Interfaces and accumulates arguments for the constructor call.
 - **StageConstructor_Interface**: A generated single-method interface nested inside the Constructor_Caller_Class, named `<ParameterName>StageConstructor` in PascalCase (e.g. `IdStageConstructor`). One StageConstructor_Interface is created per parameter.
-- **ConstructStageCaller**: A generated interface with a single zero-argument method `construct()` that calls `new EnclosingClass(...)` with all accumulated arguments and returns the new instance. Analogous to InvokeStageCaller for `@Curry`.
+- **ConstructStageInvoker**: A generated interface with a single zero-argument method `construct()` that calls `new EnclosingClass(...)` with all accumulated arguments and returns the new instance. Analogous to InvokeStageInvoker for `@Invoker`.
 - **Constructor_Entry_Point**: The `public static` method named `constructor()` (always this literal name) injected into the enclosing class that starts the staged construction chain by returning the first StageConstructor_Interface.
 - **Constructor_Overload_Group**: The set of all `@Constructor`-annotated constructors in the same class. Merged using the same shared-prefix and branching rules as an Overload_Group.
 
@@ -93,38 +77,38 @@ The pattern works for both instance methods and static methods, as well as const
 
 ## Requirements
 
-### Requirement 1: Validate @Curry on Methods
+### Requirement 1: Validate @Invoker on Methods
 
-**User Story:** As a library user, I want the compiler to reject invalid `@Curry` usages with a
+**User Story:** As a library user, I want the compiler to reject invalid `@Invoker` usages with a
 clear error message, so that I catch mistakes at compile time rather than at runtime.
 
 #### Acceptance Criteria
 
-1. WHEN `@Curry` is placed on a method with zero parameters, THEN THE Processor SHALL emit a
-   `Diagnostic.Kind.ERROR` message stating that currying requires at least one parameter, referencing
+1. WHEN `@Invoker` is placed on a method with zero parameters, THEN THE Processor SHALL emit a
+   `Diagnostic.Kind.ERROR` message stating that `@Invoker` requires at least one parameter, referencing
    the offending element.
-2. WHEN `@Curry` is placed on a private method, THEN THE Processor SHALL emit a
-   `Diagnostic.Kind.ERROR` message stating that `@Curry` requires at least package-private
+2. WHEN `@Invoker` is placed on a private method, THEN THE Processor SHALL emit a
+   `Diagnostic.Kind.ERROR` message stating that `@Invoker` requires at least package-private
    visibility, referencing the offending element.
-3. WHEN `@Curry` is placed on a valid method (instance or static) with one or more non-private
+3. WHEN `@Invoker` is placed on a valid method (instance or static) with one or more non-private
    parameters, THE Processor SHALL emit no error diagnostics for that element.
 
 ---
 
-### Requirement 2: Validate @Curry on Constructors
+### Requirement 2: Validate @Invoker on Constructors
 
-**User Story:** As a library user, I want to curry constructors as well as methods, so that I can
+**User Story:** As a library user, I want to use staged invocation on constructors as well as methods, so that I can
 apply the same compile-time-safe construction pattern to any class.
 
 #### Acceptance Criteria
 
-1. WHEN `@Curry` is placed on a constructor with zero parameters, THEN THE Processor SHALL emit a
-   `Diagnostic.Kind.ERROR` message stating that currying requires at least one parameter, referencing
+1. WHEN `@Invoker` is placed on a constructor with zero parameters, THEN THE Processor SHALL emit a
+   `Diagnostic.Kind.ERROR` message stating that `@Invoker` requires at least one parameter, referencing
    the offending element.
-2. WHEN `@Curry` is placed on a private constructor, THEN THE Processor SHALL emit a
-   `Diagnostic.Kind.ERROR` message stating that `@Curry` requires at least package-private
+2. WHEN `@Invoker` is placed on a private constructor, THEN THE Processor SHALL emit a
+   `Diagnostic.Kind.ERROR` message stating that `@Invoker` requires at least package-private
    visibility, referencing the offending element.
-3. WHEN `@Curry` is placed on a valid constructor with one or more parameters, THE Processor SHALL
+3. WHEN `@Invoker` is placed on a valid constructor with one or more parameters, THE Processor SHALL
    emit no error diagnostics for that element.
 
 ---
@@ -132,7 +116,7 @@ apply the same compile-time-safe construction pattern to any class.
 ### Requirement 3: Inject Parameterless Overload into Original Class
 
 **User Story:** As a library user, I want a zero-argument overload of my annotated method to be
-available on the original class, so that I can start the curried chain with `foo.bar()` without
+available on the original class, so that I can start the staged invocation chain with `foo.bar()` without
 any separate factory class.
 
 #### Acceptance Criteria
@@ -142,7 +126,7 @@ any separate factory class.
    file in the build output directory.
 2. THE Parameterless_Overload SHALL have the same access modifier as the Annotated_Element (public,
    protected, or package-private).
-3. THE Parameterless_Overload SHALL return the Entry_Stage interface type (`Foo.Bar.XStageCaller`
+3. THE Parameterless_Overload SHALL return the Entry_Stage interface type (`Foo.Bar.XStageInvoker`
    where `x` is the name of the first parameter).
 4. WHEN the Annotated_Element is a static method, THE Parameterless_Overload SHALL also be static.
 5. WHEN the Annotated_Element is an instance method, THE Parameterless_Overload SHALL be an instance
@@ -157,7 +141,7 @@ any separate factory class.
 
 ### Requirement 4: Generate Caller Class
 
-**User Story:** As a library user, I want a generated inner class to accumulate my curried arguments
+**User Story:** As a library user, I want a generated inner class to accumulate my staged invocation arguments
 and invoke the original method at the final step, so that the chain is self-contained and immutable.
 
 #### Acceptance Criteria
@@ -183,14 +167,14 @@ self-documenting method names.
 #### Acceptance Criteria
 
 1. THE Bytecode_Manipulator SHALL generate one Stage_Interface per parameter of the Annotated_Element,
-   nested inside the Caller_Class, named `<ParameterName>StageCaller` in PascalCase
-   (e.g. `XStageCaller` for parameter `x`).
+   nested inside the Caller_Class, named `<ParameterName>StageInvoker` in PascalCase
+   (e.g. `XStageInvoker` for parameter `x`).
 2. Each Stage_Interface SHALL declare exactly one Stage_Method named after the parameter (e.g. `x(int x)`).
 3. For all Stage_Interfaces except the last, the Stage_Method SHALL return the next Stage_Interface
    in the Chain.
-4. For the last Stage_Interface, the Stage_Method SHALL return an InvokeStageCaller (not the
+4. For the last Stage_Interface, the Stage_Method SHALL return an InvokeStageInvoker (not the
    Final_Result directly).
-5. THE Bytecode_Manipulator SHALL generate one InvokeStageCaller interface per Annotated_Element
+5. THE Bytecode_Manipulator SHALL generate one InvokeStageInvoker interface per Annotated_Element
    (or per distinct terminal sub-chain in an Overload_Group), with a single zero-argument method
    `invoke()` that returns the Final_Result. WHEN the Annotated_Element returns `void`, `invoke()`
    SHALL also return `void`.
@@ -205,12 +189,12 @@ self-documenting method names.
 ### Requirement 6: Chain Invocation and Final Result
 
 **User Story:** As a library user, I want to call `.invoke()` at the end of the chain to trigger
-the original method with all accumulated arguments and return its result, so that the curried chain
+the original method with all accumulated arguments and return its result, so that the staged invocation chain
 is functionally equivalent to calling the original directly.
 
 #### Acceptance Criteria
 
-1. THE last Stage_Method in the Caller_Class SHALL return an InvokeStageCaller whose `invoke()`
+1. THE last Stage_Method in the Caller_Class SHALL return an InvokeStageInvoker whose `invoke()`
    method invokes the Annotated_Element with all accumulated arguments and returns the Final_Result.
 2. WHEN the Annotated_Element is a constructor, THE `invoke()` implementation SHALL use
    `new EnclosingClass(...)` to construct and return the instance.
@@ -220,17 +204,17 @@ is functionally equivalent to calling the original directly.
    to the captured instance reference and return its result.
 5. THE Bytecode_Manipulator SHALL propagate any checked exceptions declared on the Annotated_Element
    through every Stage_Interface's Stage_Method signature and through the `invoke()` method of the
-   InvokeStageCaller.
+   InvokeStageInvoker.
 6. FOR ALL valid Annotated_Elements, completing the full Chain and calling `.invoke()` SHALL produce
    a result equal to calling the Annotated_Element directly with the same arguments (round-trip
    equivalence).
 
 ---
 
-### Requirement 7: Support Multiple @Curry Annotations on the Same Class
+### Requirement 7: Support Multiple @Invoker Annotations on the Same Class
 
 **User Story:** As a library user, I want to annotate multiple methods or constructors in the same
-class, so that I can curry several methods without conflicts.
+class, so that I can use staged invocation on several methods without conflicts.
 
 #### Acceptance Criteria
 
@@ -241,7 +225,7 @@ class, so that I can curry several methods without conflicts.
    Annotated_Element's name in PascalCase.
 3. WHEN two Annotated_Elements in the same class share the same name and identical parameter lists
    (same count, names, and types), THEN THE Processor SHALL emit a `Diagnostic.Kind.ERROR` message
-   indicating an ambiguous curry target and SHALL NOT generate code for the conflicting elements.
+   indicating an ambiguous invoker target and SHALL NOT generate code for the conflicting elements.
 4. WHEN multiple Annotated_Elements in the same class share the same name but differ in parameter
    lists, THE Processor SHALL treat them as an Overload_Group and apply overload-merging rules
    (see Requirements 11–14) rather than emitting an error.
@@ -250,8 +234,8 @@ class, so that I can curry several methods without conflicts.
 
 ### Requirement 8: Code Generation Correctness
 
-**User Story:** As a contributor, I want the generated curried API to be semantically equivalent to
-calling the original method directly, so that adopting `@Curry` does not change program behaviour.
+**User Story:** As a contributor, I want the generated staged invocation API to be semantically equivalent to
+calling the original method directly, so that adopting `@Invoker` does not change program behaviour.
 
 #### Acceptance Criteria
 
@@ -280,7 +264,7 @@ incremental builds and multi-round processing, so that it does not produce dupli
 2. WHEN the target `.class` file has already been modified in a previous incremental build run,
    THE Bytecode_Manipulator SHALL detect the injected members and SHALL NOT inject them again.
 3. THE Processor SHALL return `false` from `process()` to allow other annotation processors to
-   observe `@Curry`-annotated elements.
+   observe `@Invoker`-annotated elements.
 
 ---
 
@@ -295,15 +279,15 @@ during bytecode manipulation, so that I can trace what was generated and why.
    SHALL emit a `Diagnostic.Kind.NOTE` message identifying the modified class and the source element.
 2. WHEN the Processor skips manipulation due to a validation error, THE Processor SHALL emit exactly
    one `Diagnostic.Kind.ERROR` per violated rule, referencing the offending element.
-3. WHERE the processor option `curry.debug` is set to `true`, THE Processor SHALL emit additional
+3. WHERE the processor option `invoker.debug` is set to `true`, THE Processor SHALL emit additional
    `Diagnostic.Kind.NOTE` messages describing each Stage_Interface and Stage_Method generated.
 
 ---
 
 ### Requirement 11: Overload Branching in Stage Interfaces
 
-**User Story:** As a library user, I want overloaded `@Curry` methods with the same name to share
-a single curried entry point and diverge into separate branches only where their signatures differ,
+**User Story:** As a library user, I want overloaded `@Invoker` methods with the same name to share
+a single staged invocation entry point and diverge into separate branches only where their signatures differ,
 so that the generated API is minimal and non-redundant.
 
 #### Acceptance Criteria
@@ -320,26 +304,26 @@ so that the generated API is minimal and non-redundant.
    position that exposes one Stage_Method per distinct parameter variant among the diverging
    overloads.
 5. THE Branching_Stage SHALL be named after the last shared parameter using the
-   `<ParameterName>StageCaller` convention; IF divergence occurs at the very first parameter, THE
-   Branching_Stage SHALL be named `<MethodName>StageCaller` (e.g. `BarStageCaller`).
+   `<ParameterName>StageInvoker` convention; IF divergence occurs at the very first parameter, THE
+   Branching_Stage SHALL be named `<MethodName>StageInvoker` (e.g. `BarStageInvoker`).
 6. Each Stage_Method on the Branching_Stage SHALL return the next Stage_Interface (or an
-   InvokeStageCaller if it is the terminal stage of that sub-chain) appropriate for the sub-chain
+   InvokeStageInvoker if it is the terminal stage of that sub-chain) appropriate for the sub-chain
    it continues.
 
 **Example A — diverge at second parameter:**
 ```java
-@Curry public void bar(int x, int y) {}
-@Curry public void bar(int x, String name) {}
+@Invoker public void bar(int x, int y) {}
+@Invoker public void bar(int x, String name) {}
 ```
-`bar()` → `XStageCaller.x(int)` → `BarXStageCaller` with both `y(int)` (returns InvokeStageCaller)
-and `name(String)` (returns InvokeStageCaller).
+`bar()` → `XStageInvoker.x(int)` → `BarXStageInvoker` with both `y(int)` (returns InvokeStageInvoker)
+and `name(String)` (returns InvokeStageInvoker).
 
 **Example B — diverge at first parameter:**
 ```java
-@Curry public void bar(int x, int y) {}
-@Curry public void bar(String name, int z) {}
+@Invoker public void bar(int x, int y) {}
+@Invoker public void bar(String name, int z) {}
 ```
-`bar()` → `BarStageCaller` with both `x(int x)` and `name(String name)` as first-step methods.
+`bar()` → `BarStageInvoker` with both `x(int x)` and `name(String name)` as first-step methods.
 
 ---
 
@@ -352,24 +336,24 @@ entry point.
 #### Acceptance Criteria
 
 1. WHEN an Overload_Group contains a Prefix_Overload, the stage reached after the last parameter of
-   the shorter overload SHALL expose both an InvokeStageCaller (via the last Stage_Method) and the
+   the shorter overload SHALL expose both an InvokeStageInvoker (via the last Stage_Method) and the
    Stage_Method(s) for the next parameter of the longer overload(s).
-2. Calling `.invoke()` on the InvokeStageCaller at that stage SHALL invoke the Prefix_Overload with
+2. Calling `.invoke()` on the InvokeStageInvoker at that stage SHALL invoke the Prefix_Overload with
    all accumulated arguments and return its Final_Result.
 3. Calling the next-parameter Stage_Method at that stage SHALL continue the chain toward the longer
-   overload, ultimately ending in its own InvokeStageCaller.
+   overload, ultimately ending in its own InvokeStageInvoker.
 4. FOR ALL valid Prefix_Overloads, calling `.invoke()` at the appropriate stage SHALL produce a
    result equal to calling the Prefix_Overload directly with the same arguments (round-trip
    equivalence).
 
 **Example:**
 ```java
-@Curry public void bar(int x, int y) {}
-@Curry public void bar(int x, int y, int z) {}
+@Invoker public void bar(int x, int y) {}
+@Invoker public void bar(int x, int y, int z) {}
 ```
-`bar()` → `XStageCaller.x(int)` → `YStageCaller.y(int)` → stage that exposes:
+`bar()` → `XStageInvoker.x(int)` → `YStageInvoker.y(int)` → stage that exposes:
 - `.invoke()` — calls `bar(10, 20)`, returns `void`
-- `.z(int z)` — continues to InvokeStageCaller whose `.invoke()` calls `bar(10, 20, 30)`
+- `.z(int z)` — continues to InvokeStageInvoker whose `.invoke()` calls `bar(10, 20, 30)`
 
 ```java
 foo.bar().x(10).y(20).invoke()         // calls bar(10, 20)
@@ -380,7 +364,7 @@ foo.bar().x(10).y(20).z(30).invoke()   // calls bar(10, 20, 30)
 
 ### Requirement 13: Error — Parameterless Overload Already Exists
 
-**User Story:** As a library user, I want a clear compile-time error when `@Curry` would generate
+**User Story:** As a library user, I want a clear compile-time error when `@Invoker` would generate
 a `bar()` overload that conflicts with an existing zero-parameter method, so that I can resolve the
 naming clash before it causes a silent runtime issue.
 
@@ -388,11 +372,11 @@ naming clash before it causes a silent runtime issue.
 
 1. WHEN the Processor would inject a Parameterless_Overload named `bar` but a method with that name
    and zero parameters already exists on the class, THEN THE Processor SHALL emit a
-   `Diagnostic.Kind.ERROR` at the `@Curry` annotation site stating that a parameterless overload
+   `Diagnostic.Kind.ERROR` at the `@Invoker` annotation site stating that a parameterless overload
    with that name already exists.
 2. WHEN the error in criterion 1 is triggered, THE Processor SHALL NOT inject any Caller_Class or
    Stage_Interfaces for that Overload_Group.
-3. THE error message SHALL include the method name so the developer can identify which `@Curry`
+3. THE error message SHALL include the method name so the developer can identify which `@Invoker`
    annotation caused the conflict.
 
 ---
@@ -407,7 +391,7 @@ silently generate an ambiguous or incorrect stage tree.
 
 1. WHEN building the merged stage tree for an Overload_Group, IF two overloads contribute a
    parameter at the same position with the same name but different types, THEN THE Processor SHALL
-   emit a `Diagnostic.Kind.ERROR` at the `@Curry` annotation site of each conflicting overload.
+   emit a `Diagnostic.Kind.ERROR` at the `@Invoker` annotation site of each conflicting overload.
 2. WHEN the error in criterion 1 is triggered, THE Processor SHALL NOT generate any Caller_Class or
    Stage_Interfaces for the conflicting Overload_Group.
 3. THE error message SHALL identify the conflicting parameter name and list all types involved in
@@ -499,7 +483,7 @@ method names.
    (e.g. `id(int id)`).
 3. For all StageConstructor_Interfaces except the last, the stage method SHALL return the next
    StageConstructor_Interface in the chain.
-4. For the last StageConstructor_Interface, the stage method SHALL return a ConstructStageCaller
+4. For the last StageConstructor_Interface, the stage method SHALL return a ConstructStageInvoker
    (not the enclosing class instance directly).
 5. WHEN a parameter type is a primitive, THE stage method SHALL use the primitive type directly
    (no auto-boxing to wrapper types).
@@ -508,7 +492,7 @@ method names.
 
 ---
 
-### Requirement 19: Terminal ConstructStageCaller and .construct() Method
+### Requirement 19: Terminal ConstructStageInvoker and .construct() Method
 
 **User Story:** As a library user, I want to call `.construct()` at the end of the chain to
 instantiate the class with all accumulated arguments, so that the staged chain is functionally
@@ -516,10 +500,10 @@ equivalent to calling `new Foo(...)` directly.
 
 #### Acceptance Criteria
 
-1. THE Bytecode_Manipulator SHALL generate one ConstructStageCaller interface per annotated
+1. THE Bytecode_Manipulator SHALL generate one ConstructStageInvoker interface per annotated
    constructor (or per distinct terminal sub-chain in a Constructor_Overload_Group), nested inside
    the Constructor_Caller_Class.
-2. THE ConstructStageCaller SHALL declare exactly one zero-argument method named `construct()` that
+2. THE ConstructStageInvoker SHALL declare exactly one zero-argument method named `construct()` that
    returns the enclosing class type (e.g. `Foo construct()`).
 3. THE `construct()` implementation in the Constructor_Caller_Class SHALL invoke
    `new EnclosingClass(arg1, arg2, ...)` with all accumulated arguments and return the new instance.
@@ -528,7 +512,7 @@ equivalent to calling `new Foo(...)` directly.
    arguments (round-trip equivalence).
 5. THE Bytecode_Manipulator SHALL propagate any checked exceptions declared on the annotated
    constructor through every StageConstructor_Interface's stage method signature and through the
-   `construct()` method of the ConstructStageCaller.
+   `construct()` method of the ConstructStageInvoker.
 
 ---
 
@@ -553,7 +537,7 @@ where their signatures differ, so that the generated API is minimal and non-redu
    variant among the diverging constructors.
 5. WHEN a Constructor_Overload_Group contains a Prefix_Overload (one constructor's parameter list
    is a strict prefix of another's), the stage reached after the last parameter of the shorter
-   constructor SHALL expose both a ConstructStageCaller (via `.construct()`) and the stage
+   constructor SHALL expose both a ConstructStageInvoker (via `.construct()`) and the stage
    method(s) for the next parameter of the longer constructor(s).
 6. Calling `.construct()` at the prefix stage SHALL invoke the shorter constructor with all
    accumulated arguments and return the new instance.

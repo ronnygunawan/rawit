@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement the `@Curry` and `@Constructor` annotation processor in Java 21 / Maven. The pipeline
+Implement the `@Invoker` and `@Constructor` annotation processor in Java 21 / Maven. The pipeline
 is: validate → model → merge tree → JavaPoet code generation → ASM bytecode injection → wire into
 `RawitAnnotationProcessor`. Each task builds on the previous and ends with everything wired
 together.
@@ -16,15 +16,15 @@ together.
     - Add `maven-surefire-plugin` configured for JUnit Platform so jqwik tests run with `mvn test`
     - _Requirements: none (build infrastructure)_
   - [x] 1.2 Create `rawit/Constructor.java` annotation
-    - Mirror `@Curry` but target `ElementType.CONSTRUCTOR` only, `RetentionPolicy.SOURCE`
+    - Mirror `@Invoker` but target `ElementType.CONSTRUCTOR` only, `RetentionPolicy.SOURCE`
     - _Requirements: 15.1_
   - [x] 1.3 Update `RawitAnnotationProcessor.getSupportedAnnotationTypes()` to include `rawit.Constructor`
-    - Add `@SupportedOptions("curry.debug")` to the class
+    - Add `@SupportedOptions("invoker.debug")` to the class
     - _Requirements: 15, 16_
 
 - [x] 2. Implement `ElementValidator`
   - [x] 2.1 Create `processors/validation/ElementValidator.java`
-    - Validate `@Curry`: element kind is METHOD or CONSTRUCTOR, param count ≥ 1, not private
+    - Validate `@Invoker`: element kind is METHOD or CONSTRUCTOR, param count ≥ 1, not private
     - Validate `@Constructor`: element kind is CONSTRUCTOR only, param count ≥ 1, not private
     - Check for existing zero-param overload with same name (conflict detection)
     - Return a `ValidationResult` (sealed interface: `Valid` / `Invalid`) carrying the `Messager` diagnostics
@@ -80,7 +80,7 @@ together.
 
 - [x] 6. Implement JavaPoet code generation (`codegen` package)
   - [x] 6.1 Create `processors/codegen/TerminalInterfaceSpec.java`
-    - Build `TypeSpec` for `InvokeStageCaller` (`@Curry`) and `ConstructStageCaller` (`@Constructor`)
+    - Build `TypeSpec` for `InvokeStageInvoker` (`@Invoker`) and `ConstructStageInvoker` (`@Constructor`)
     - Single zero-arg `invoke()` / `construct()` method with correct return type
     - Propagate checked exceptions in `throws` clause
     - Annotate with `@FunctionalInterface`
@@ -95,7 +95,7 @@ together.
     - **Property 14: Checked exceptions are propagated through the chain**
     - **Validates: Requirements 5.5, 5.8, 6.5, 18.6, 19.1, 19.2, 19.5**
   - [x] 6.4 Create `processors/codegen/StageInterfaceSpec.java`
-    - Build `TypeSpec` for each `<PascalParam>StageCaller` / `<PascalParam>StageConstructor` interface
+    - Build `TypeSpec` for each `<PascalParam>StageInvoker` / `<PascalParam>StageConstructor` interface
     - Single stage method named after the parameter, returning the next stage interface or terminal
     - Use primitive types directly (no boxing)
     - Annotate with `@FunctionalInterface`
@@ -112,7 +112,7 @@ together.
     - **Property 13: Stage interfaces carry @FunctionalInterface**
     - **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.6, 5.8, 18.1, 18.2, 18.3, 18.5, 18.6**
   - [x] 6.7 Create `processors/codegen/CallerClassSpec.java`
-    - Build `TypeSpec` for the `Caller_Class` (`Bar` for `@Curry`, `Constructor` for `@Constructor`)
+    - Build `TypeSpec` for the `Caller_Class` (`Bar` for `@Invoker`, `Constructor` for `@Constructor`)
     - `public static` class implementing all stage interfaces
     - `private final` fields for enclosing instance (instance methods) and accumulated args
     - Annotate with `@javax.annotation.processing.Generated("rawit.processors.RawitAnnotationProcessor")`
@@ -174,7 +174,7 @@ together.
 
 - [x] 9. Wire everything into `RawitAnnotationProcessor`
   - [x] 9.1 Update `RawitAnnotationProcessor.process()` to use all components
-    - Collect elements annotated with `@Curry` and `@Constructor` from `roundEnv`
+    - Collect elements annotated with `@Invoker` and `@Constructor` from `roundEnv`
     - Delegate each element to `ElementValidator`; skip invalid elements
     - Build `AnnotatedMethod` models from valid elements
     - Group into `OverloadGroup` instances by enclosing class + method name
@@ -182,7 +182,7 @@ together.
     - Call `JavaPoetGenerator.generate()` with all trees and `ProcessingEnvironment`
     - Call `BytecodeInjector.inject()` once per enclosing class
     - Emit `NOTE` on success per requirement 10.1 and 16.5
-    - Emit additional `NOTE` messages per stage when `curry.debug=true` (requirement 10.3)
+    - Emit additional `NOTE` messages per stage when `invoker.debug=true` (requirement 10.3)
     - Return `false` from `process()` (requirement 9.3)
     - _Requirements: 7.1, 7.2, 9.1, 9.3, 10.1, 10.3, 16.5_
   - [x] 9.2 Write end-to-end integration tests
@@ -190,7 +190,7 @@ together.
     - Load resulting `.class` files via `URLClassLoader`
     - Reflectively invoke the parameterless overload, chain all stage methods, call `.invoke()` /
       `.construct()`, assert result equals direct invocation
-    - Cover: instance method, static method, constructor (`@Curry`), `@Constructor`, overload group
+    - Cover: instance method, static method, constructor (`@Invoker`), `@Constructor`, overload group
       with branching, prefix overload
     - _Requirements: 6.6, 8.1, 8.2, 12.4, 15, 16, 19.3, 19.4_
   - [x] 9.3 Write property test for end-to-end pipeline — Properties 15, 16, 18
@@ -201,7 +201,7 @@ together.
   - [x] 9.4 Write property test for constructor pipeline — Properties 25, 26, 27
     - **Property 25: constructor() entry point is public static**
     - **Property 26: Constructor_Caller_Class is injected as a public static inner class named Constructor**
-    - **Property 27: ConstructStageCaller has a construct() method returning the enclosing type**
+    - **Property 27: ConstructStageInvoker has a construct() method returning the enclosing type**
     - **Validates: Requirements 16.1, 16.2, 17.1, 19.2**
 
 - [x] 10. Final checkpoint — Ensure all tests pass

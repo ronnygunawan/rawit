@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Uses the same three-pass compilation infrastructure as
  * {@link RawitAnnotationProcessorIntegrationTest}.
  *
- * <p>Validates: Requirements 6.6, 7.1, 7.2, 8.1, 8.4, 12.4, 19.3, 19.4, 20.7
+ * <p>Validates: Requirements 6.6, 7.1, 7.2, 8.1, 8.2, 8.4, 12.4, 19.3, 19.4, 20.7
  */
 class RawitAnnotationProcessorPropertyTest {
 
@@ -207,32 +207,32 @@ class RawitAnnotationProcessorPropertyTest {
     }
 
     // =========================================================================
-    // Property 15: Round-trip equivalence — chain invocation equals direct invocation
-    // Feature: project-rawit-curry, Property 15: Round-trip equivalence — chain invocation equals direct invocation
+    // Property 1: Round-trip equivalence — chain invocation equals direct invocation
+    // Feature: curry-to-invoker-rename, Property 1: Round-trip equivalence is preserved
     // =========================================================================
 
     /**
-     * For any int values x and y, calling the curried chain add().x(x).y(y).invoke()
+     * For any int values x and y, calling the invoker chain add().x(x).y(y).invoke()
      * must equal the direct call add(x, y).
      *
-     * Validates: Requirements 6.6, 8.1, 12.4, 19.3, 19.4, 20.7
+     * Validates: Requirements 6.6, 8.1, 8.2, 12.4, 19.3, 19.4
      */
     @Property(tries = 10)
-    void property15_roundTripEquivalence(
+    void property1_roundTripEquivalenceWithInvoker(
             @ForAll("smallInt") int x,
             @ForAll("smallInt") int y
     ) throws Exception {
-        // Feature: project-rawit-curry, Property 15: Round-trip equivalence — chain invocation equals direct invocation
+        // Feature: curry-to-invoker-rename, Property 1: Round-trip equivalence is preserved
         final String className = "RoundTripAdd_" + Math.abs(x) + "_" + Math.abs(y)
                 + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
         final String source =
-                "import rg.rawit.Curry;\n" +
+                "import rg.rawit.Invoker;\n" +
                 "public class " + className + " {\n" +
-                "    @Curry\n" +
+                "    @Invoker\n" +
                 "    public int add(int x, int y) { return x + y; }\n" +
                 "}\n";
 
-        final Path outputDir = Files.createTempDirectory("prop15_");
+        final Path outputDir = Files.createTempDirectory("prop1_");
         try (final URLClassLoader loader = compileAndLoad(className, source, outputDir)) {
             final Class<?> cls = loader.loadClass(className);
             final Object instance = cls.getDeclaredConstructor().newInstance();
@@ -256,11 +256,11 @@ class RawitAnnotationProcessorPropertyTest {
 
     // =========================================================================
     // Property 16: Multiple annotations produce separate Caller_Classes
-    // Feature: project-rawit-curry, Property 16: Multiple annotations produce separate Caller_Classes
+    // Feature: curry-to-invoker-rename, Property 16: Multiple annotations produce separate Caller_Classes
     // =========================================================================
 
     /**
-     * For any class with multiple @Curry-annotated methods with distinct names, after processing,
+     * For any class with multiple @Invoker-annotated methods with distinct names, after processing,
      * the class must contain a separate Caller_Class for each annotated method with no name collisions.
      *
      * Validates: Requirements 7.1, 7.2
@@ -269,19 +269,19 @@ class RawitAnnotationProcessorPropertyTest {
     void property16_multipleAnnotationsProduceSeparateCallerClasses(
             @ForAll("distinctMethodNames") List<String> methodNames
     ) throws Exception {
-        // Feature: project-rawit-curry, Property 16: Multiple annotations produce separate Caller_Classes
-        final String className = "MultiCurry_" + methodNames.size()
+        // Feature: curry-to-invoker-rename, Property 16: Multiple annotations produce separate Caller_Classes
+        final String className = "MultiInvoker_" + methodNames.size()
                 + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
 
-        // Build source with one @Curry method per name, each returning x + y
+        // Build source with one @Invoker method per name, each returning x + y
         final StringBuilder methods = new StringBuilder();
         for (final String name : methodNames) {
-            methods.append("    @Curry\n")
+            methods.append("    @Invoker\n")
                    .append("    public int ").append(name).append("(int x, int y) { return x + y; }\n");
         }
 
         final String source =
-                "import rg.rawit.Curry;\n" +
+                "import rg.rawit.Invoker;\n" +
                 "public class " + className + " {\n" +
                 methods +
                 "}\n";
@@ -324,11 +324,11 @@ class RawitAnnotationProcessorPropertyTest {
 
     // =========================================================================
     // Property 18: Invoke idempotency — calling invoke() multiple times produces equal results
-    // Feature: project-rawit-curry, Property 18: Invoke idempotency — calling invoke() multiple times produces equal results
+    // Feature: curry-to-invoker-rename, Property 18: Invoke idempotency — calling invoke() multiple times produces equal results
     // =========================================================================
 
     /**
-     * For any int values x and y, calling .invoke() multiple times on the same InvokeStageCaller
+     * For any int values x and y, calling .invoke() multiple times on the same InvokeStageInvoker
      * instance must produce equal results.
      *
      * Validates: Requirements 8.4
@@ -338,13 +338,13 @@ class RawitAnnotationProcessorPropertyTest {
             @ForAll("smallInt") int x,
             @ForAll("smallInt") int y
     ) throws Exception {
-        // Feature: project-rawit-curry, Property 18: Invoke idempotency — calling invoke() multiple times produces equal results
+        // Feature: curry-to-invoker-rename, Property 18: Invoke idempotency — calling invoke() multiple times produces equal results
         final String className = "IdempotentAdd_" + Math.abs(x) + "_" + Math.abs(y)
                 + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
         final String source =
-                "import rg.rawit.Curry;\n" +
+                "import rg.rawit.Invoker;\n" +
                 "public class " + className + " {\n" +
-                "    @Curry\n" +
+                "    @Invoker\n" +
                 "    public int add(int x, int y) { return x + y; }\n" +
                 "}\n";
 
@@ -353,12 +353,12 @@ class RawitAnnotationProcessorPropertyTest {
             final Class<?> cls = loader.loadClass(className);
             final Object instance = cls.getDeclaredConstructor().newInstance();
 
-            // Build the chain up to the InvokeStageCaller
+            // Build the chain up to the InvokeStageInvoker
             final Object addStage = cls.getMethod("add").invoke(instance);
             final Object xStage = reflectInvokeInt(addStage, "x", x);
             final Object invokeStage = reflectInvokeInt(xStage, "y", y);
 
-            // Call invoke() multiple times on the same InvokeStageCaller instance
+            // Call invoke() multiple times on the same InvokeStageInvoker instance
             final Object result1 = reflectInvoke(invokeStage, "invoke");
             final Object result2 = reflectInvoke(invokeStage, "invoke");
             final Object result3 = reflectInvoke(invokeStage, "invoke");

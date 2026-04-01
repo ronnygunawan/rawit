@@ -67,7 +67,7 @@ class StageInterfaceSpecTest {
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 
         assertEquals(1, specs.size());
-        assertEquals("XStageCaller", specs.get(0).name);
+        assertEquals("XStageInvoker", specs.get(0).name);
     }
 
     @Test
@@ -76,8 +76,8 @@ class StageInterfaceSpecTest {
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 
         assertEquals(2, specs.size());
-        assertEquals("XStageCaller", specs.get(0).name);
-        assertEquals("YStageCaller", specs.get(1).name);
+        assertEquals("XStageInvoker", specs.get(0).name);
+        assertEquals("YStageInvoker", specs.get(1).name);
     }
 
     @Test
@@ -94,9 +94,9 @@ class StageInterfaceSpecTest {
 
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 
-        // First interface should be named BarStageCaller (method name at position 0)
-        assertTrue(specs.stream().anyMatch(s -> s.name.equals("BarStageCaller")),
-                "branching at position 0 must produce BarStageCaller");
+        // First interface should be named BarStageInvoker (method name at position 0)
+        assertTrue(specs.stream().anyMatch(s -> s.name.equals("BarStageInvoker")),
+                "branching at position 0 must produce BarStageInvoker");
     }
 
     @Test
@@ -114,11 +114,11 @@ class StageInterfaceSpecTest {
 
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 
-        // XStageCaller for the shared x, then BarXStageCaller for the branching (prev param = x)
-        assertTrue(specs.stream().anyMatch(s -> s.name.equals("XStageCaller")),
-                "shared x must produce XStageCaller");
-        assertTrue(specs.stream().anyMatch(s -> s.name.equals("BarXStageCaller")),
-                "branching after x must produce BarXStageCaller");
+        // XStageInvoker for the shared x, then BarXStageInvoker for the branching (prev param = x)
+        assertTrue(specs.stream().anyMatch(s -> s.name.equals("XStageInvoker")),
+                "shared x must produce XStageInvoker");
+        assertTrue(specs.stream().anyMatch(s -> s.name.equals("BarXStageInvoker")),
+                "branching after x must produce BarXStageInvoker");
     }
 
     // -------------------------------------------------------------------------
@@ -165,25 +165,25 @@ class StageInterfaceSpecTest {
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 
         String xSource = toSource(specs.get(0));
-        assertTrue(xSource.contains("YStageCaller x("), "x() must return YStageCaller");
+        assertTrue(xSource.contains("YStageInvoker x("), "x() must return YStageInvoker");
     }
 
     @Test
-    void lastStageReturnsInvokeStageCaller() {
+    void lastStageReturnsInvokeStageInvoker() {
         MergeTree tree = singleOverloadTree("bar", p("x", "I"), p("y", "I"));
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 
         String ySource = toSource(specs.get(1));
-        assertTrue(ySource.contains("InvokeStageCaller y("), "y() must return InvokeStageCaller");
+        assertTrue(ySource.contains("InvokeStageInvoker y("), "y() must return InvokeStageInvoker");
     }
 
     @Test
-    void singleParamStageReturnsInvokeStageCaller() {
+    void singleParamStageReturnsInvokeStageInvoker() {
         MergeTree tree = singleOverloadTree("bar", p("x", "I"));
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 
         String source = toSource(specs.get(0));
-        assertTrue(source.contains("InvokeStageCaller x("), "single-param stage must return InvokeStageCaller");
+        assertTrue(source.contains("InvokeStageInvoker x("), "single-param stage must return InvokeStageInvoker");
     }
 
     // -------------------------------------------------------------------------

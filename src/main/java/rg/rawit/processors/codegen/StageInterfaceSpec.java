@@ -17,13 +17,13 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Builds {@link TypeSpec} instances for each stage interface in a curried chain.
+ * Builds {@link TypeSpec} instances for each stage interface in an invoker chain.
  *
  * <p>Applies Algorithm 2 (stage interface name resolution) from the design:
  * <ul>
- *   <li>{@code SharedNode} → {@code <PascalParam>StageCaller} / {@code <PascalParam>StageConstructor}</li>
- *   <li>{@code BranchingNode} at position 0 → {@code <PascalMethod>StageCaller}</li>
- *   <li>{@code BranchingNode} at position n → {@code <PascalPrevParam>StageCaller}</li>
+ *   <li>{@code SharedNode} → {@code <PascalParam>StageInvoker} / {@code <PascalParam>StageConstructor}</li>
+ *   <li>{@code BranchingNode} at position 0 → {@code <PascalMethod>StageInvoker}</li>
+ *   <li>{@code BranchingNode} at position n → {@code <PascalPrevParam>StageInvoker}</li>
  *   <li>{@code TerminalNode} with continuation → exposes both terminal and continuation methods</li>
  * </ul>
  *
@@ -33,13 +33,13 @@ import java.util.Set;
 public class StageInterfaceSpec {
 
     private final MergeTree tree;
-    private final boolean isCurry;
+    private final boolean isInvoker;
 
     public StageInterfaceSpec(final MergeTree tree) {
         this.tree = tree;
-        // isCurry is true for @Curry annotations (including @Curry on constructors)
-        // isCurry is false only for @Constructor annotations
-        this.isCurry = tree.group().members().stream().anyMatch(m -> !m.isConstructorAnnotation());
+        // isInvoker is true for @Invoker annotations (including @Invoker on constructors)
+        // isInvoker is false only for @Constructor annotations
+        this.isInvoker = tree.group().members().stream().anyMatch(m -> !m.isConstructorAnnotation());
     }
 
     /**
@@ -177,12 +177,12 @@ public class StageInterfaceSpec {
             final int position,
             final boolean isBranching
     ) {
-        final String suffix = isCurry ? "StageCaller" : "StageConstructor";
+        final String suffix = isInvoker ? "StageInvoker" : "StageConstructor";
         return toPascalCase(paramName) + suffix;
     }
 
     private String branchingInterfaceName(final String prevParamName, final int position) {
-        final String suffix = isCurry ? "StageCaller" : "StageConstructor";
+        final String suffix = isInvoker ? "StageInvoker" : "StageConstructor";
         // For constructors, groupName is "<init>" which is not a valid Java identifier.
         // Use the enclosing class simple name instead.
         final String groupName = tree.group().groupName();
@@ -237,7 +237,7 @@ public class StageInterfaceSpec {
 
     private TypeName terminalTypeName() {
         return com.squareup.javapoet.ClassName.bestGuess(
-                isCurry ? "InvokeStageCaller" : "ConstructStageCaller");
+                isInvoker ? "InvokeStageInvoker" : "ConstructStageInvoker");
     }
 
     /**
@@ -245,11 +245,11 @@ public class StageInterfaceSpec {
      * The combined interface exposes both {@code invoke()}/{@code construct()} and the
      * continuation's stage methods.
      *
-     * <p>Named {@code <PrevParam>WithInvokeStageCaller} (e.g. {@code YWithInvokeStageCaller}
+     * <p>Named {@code <PrevParam>WithInvokeStageInvoker} (e.g. {@code YWithInvokeStageInvoker}
      * for the stage after parameter {@code y}).
      */
     private String combinedInterfaceName(final String prevParamName, final int position) {
-        final String suffix = isCurry ? "WithInvokeStageCaller" : "WithConstructStageCaller";
+        final String suffix = isInvoker ? "WithInvokeStageInvoker" : "WithConstructStageInvoker";
         if (prevParamName == null || prevParamName.isEmpty()) {
             return toPascalCase(tree.group().groupName()) + suffix;
         }

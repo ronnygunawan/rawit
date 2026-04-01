@@ -137,21 +137,21 @@ class ElementValidatorPropertyTest {
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
-    void property1_validCurryMethod_producesNoErrors(
+    void property1_validInvokerMethod_producesNoErrors(
             @ForAll("validMethodNames") String methodName,
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
-        // Feature: project-rawit-curry, Property 1: Valid element produces no errors
-        // Validates: Requirements 1.3, 2.3, 15.4
+        // Feature: curry-to-invoker-rename, Property 1: Valid @Invoker element produces no errors
+        // Validates: Requirements 1.3, 2.3
 
-        String className = uniqueClassName("ValidCurryMethod");
+        String className = uniqueClassName("ValidInvokerMethod");
         String visibilityPrefix = visibility.isEmpty() ? "" : visibility + " ";
         String params = buildParams(paramTypes);
 
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class %s {
-                    @Curry
+                    @Invoker
                     %sint method_%s(%s) { return 0; }
                 }
                 """.formatted(className, visibilityPrefix, methodName, params);
@@ -160,25 +160,25 @@ class ElementValidatorPropertyTest {
 
         long errorCount = countErrors(diags);
         assertEquals(0, errorCount,
-                "Expected 0 errors for valid @Curry method '%s' with visibility '%s' and %d params, got %d. Diagnostics: %s"
+                "Expected 0 errors for valid @Invoker method '%s' with visibility '%s' and %d params, got %d. Diagnostics: %s"
                 .formatted(methodName, visibility, paramTypes.size(), errorCount, diags));
     }
 
     @Property(tries = 100)
-    void property1_validCurryConstructor_producesNoErrors(
+    void property1_validInvokerConstructor_producesNoErrors(
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
-        // Feature: project-rawit-curry, Property 1: Valid element produces no errors
-        // Validates: Requirements 2.3, 15.4
+        // Feature: curry-to-invoker-rename, Property 1: Valid @Invoker element produces no errors
+        // Validates: Requirements 2.3
 
-        String className = uniqueClassName("ValidCurryCtor");
+        String className = uniqueClassName("ValidInvokerCtor");
         String visibilityPrefix = visibility.isEmpty() ? "" : visibility + " ";
         String params = buildParams(paramTypes);
 
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class %s {
-                    @Curry
+                    @Invoker
                     %s%s(%s) {}
                 }
                 """.formatted(className, visibilityPrefix, className, params);
@@ -187,7 +187,7 @@ class ElementValidatorPropertyTest {
 
         long errorCount = countErrors(diags);
         assertEquals(0, errorCount,
-                "Expected 0 errors for valid @Curry constructor with visibility '%s' and %d params, got %d. Diagnostics: %s"
+                "Expected 0 errors for valid @Invoker constructor with visibility '%s' and %d params, got %d. Diagnostics: %s"
                 .formatted(visibility, paramTypes.size(), errorCount, diags));
     }
 
@@ -195,7 +195,7 @@ class ElementValidatorPropertyTest {
     void property1_validConstructorAnnotation_producesNoErrors(
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
-        // Feature: project-rawit-curry, Property 1: Valid element produces no errors
+        // Feature: curry-to-invoker-rename, Property 1: Valid @Invoker element produces no errors
         // Validates: Requirements 15.4
 
         String className = uniqueClassName("ValidConstructorAnnotation");
@@ -223,25 +223,25 @@ class ElementValidatorPropertyTest {
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
-    void property20_curryZeroParams_exactlyOneError(
+    void property20_invokerZeroParams_exactlyOneError(
             @ForAll("validMethodNames") String methodName,
             @ForAll("validVisibilities") String visibility) {
-        // Feature: project-rawit-curry, Property 20: Exactly one error per violated validation rule
+        // Feature: curry-to-invoker-rename, Property 20: Exactly one error per violated validation rule
         // Validates: Requirements 10.2
         //
-        // Note: a zero-param @Curry method triggers both the "zero params" rule AND the
+        // Note: a zero-param @Invoker method triggers both the "zero params" rule AND the
         // conflict-detection rule (the method itself is a zero-param overload with the same name),
         // so the validator emits exactly 2 errors. We assert >= 1 to confirm that violations
         // always produce errors, and separately verify the count is 2 (both rules fire).
 
-        String className = uniqueClassName("ZeroParamCurry");
+        String className = uniqueClassName("ZeroParamInvoker");
         String visibilityPrefix = visibility.isEmpty() ? "" : visibility + " ";
 
         // Violations: zero params + self-conflict (both fire simultaneously)
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class %s {
-                    @Curry
+                    @Invoker
                     %svoid %s() {}
                 }
                 """.formatted(className, visibilityPrefix, methodName);
@@ -254,25 +254,25 @@ class ElementValidatorPropertyTest {
         // rule 2: conflict (method itself is a zero-param overload with same name) → 1 error
         // Total: exactly 2 errors for this specific combination
         assertEquals(2, errorCount,
-                "Expected exactly 2 errors for @Curry zero-param method (zero-params + self-conflict), got %d. Diagnostics: %s"
+                "Expected exactly 2 errors for @Invoker zero-param method (zero-params + self-conflict), got %d. Diagnostics: %s"
                 .formatted(errorCount, diags));
     }
 
     @Property(tries = 100)
-    void property20_curryPrivateMethod_exactlyOneError(
+    void property20_invokerPrivateMethod_exactlyOneError(
             @ForAll("validMethodNames") String methodName,
             @ForAll("paramTypeLists") List<String> paramTypes) {
-        // Feature: project-rawit-curry, Property 20: Exactly one error per violated validation rule
+        // Feature: curry-to-invoker-rename, Property 20: Exactly one error per violated validation rule
         // Validates: Requirements 10.2
 
-        String className = uniqueClassName("PrivateCurryMethod");
+        String className = uniqueClassName("PrivateInvokerMethod");
         String params = buildParams(paramTypes);
 
         // Single violation: private visibility (param count is valid)
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class %s {
-                    @Curry
+                    @Invoker
                     private void %s(%s) {}
                 }
                 """.formatted(className, methodName, params);
@@ -281,24 +281,24 @@ class ElementValidatorPropertyTest {
 
         long errorCount = countErrors(diags);
         assertEquals(1, errorCount,
-                "Expected exactly 1 error for private @Curry method with %d params, got %d. Diagnostics: %s"
+                "Expected exactly 1 error for private @Invoker method with %d params, got %d. Diagnostics: %s"
                 .formatted(paramTypes.size(), errorCount, diags));
     }
 
     @Property(tries = 100)
-    void property20_curryZeroParamsConstructor_exactlyOneError(
+    void property20_invokerZeroParamsConstructor_exactlyOneError(
             @ForAll("validVisibilities") String visibility) {
-        // Feature: project-rawit-curry, Property 20: Exactly one error per violated validation rule
+        // Feature: curry-to-invoker-rename, Property 20: Exactly one error per violated validation rule
         // Validates: Requirements 10.2
 
-        String className = uniqueClassName("ZeroParamCurryCtor");
+        String className = uniqueClassName("ZeroParamInvokerCtor");
         String visibilityPrefix = visibility.isEmpty() ? "" : visibility + " ";
 
         // Single violation: zero params on constructor
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class %s {
-                    @Curry
+                    @Invoker
                     %s%s() {}
                 }
                 """.formatted(className, visibilityPrefix, className);
@@ -307,24 +307,24 @@ class ElementValidatorPropertyTest {
 
         long errorCount = countErrors(diags);
         assertEquals(1, errorCount,
-                "Expected exactly 1 error for @Curry constructor with zero params (visibility='%s'), got %d. Diagnostics: %s"
+                "Expected exactly 1 error for @Invoker constructor with zero params (visibility='%s'), got %d. Diagnostics: %s"
                 .formatted(visibility, errorCount, diags));
     }
 
     @Property(tries = 100)
-    void property20_curryPrivateConstructor_exactlyOneError(
+    void property20_invokerPrivateConstructor_exactlyOneError(
             @ForAll("paramTypeLists") List<String> paramTypes) {
-        // Feature: project-rawit-curry, Property 20: Exactly one error per violated validation rule
+        // Feature: curry-to-invoker-rename, Property 20: Exactly one error per violated validation rule
         // Validates: Requirements 10.2
 
-        String className = uniqueClassName("PrivateCurryCtor");
+        String className = uniqueClassName("PrivateInvokerCtor");
         String params = buildParams(paramTypes);
 
         // Single violation: private constructor
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class %s {
-                    @Curry
+                    @Invoker
                     private %s(%s) {}
                 }
                 """.formatted(className, className, params);
@@ -333,14 +333,14 @@ class ElementValidatorPropertyTest {
 
         long errorCount = countErrors(diags);
         assertEquals(1, errorCount,
-                "Expected exactly 1 error for private @Curry constructor with %d params, got %d. Diagnostics: %s"
+                "Expected exactly 1 error for private @Invoker constructor with %d params, got %d. Diagnostics: %s"
                 .formatted(paramTypes.size(), errorCount, diags));
     }
 
     @Property(tries = 100)
     void property20_constructorAnnotationZeroParams_exactlyOneError(
             @ForAll("validVisibilities") String visibility) {
-        // Feature: project-rawit-curry, Property 20: Exactly one error per violated validation rule
+        // Feature: curry-to-invoker-rename, Property 20: Exactly one error per violated validation rule
         // Validates: Requirements 10.2
 
         String className = uniqueClassName("ZeroParamConstructorAnnotation");
@@ -366,7 +366,7 @@ class ElementValidatorPropertyTest {
     @Property(tries = 100)
     void property20_constructorAnnotationPrivate_exactlyOneError(
             @ForAll("paramTypeLists") List<String> paramTypes) {
-        // Feature: project-rawit-curry, Property 20: Exactly one error per violated validation rule
+        // Feature: curry-to-invoker-rename, Property 20: Exactly one error per violated validation rule
         // Validates: Requirements 10.2
 
         String className = uniqueClassName("PrivateConstructorAnnotation");

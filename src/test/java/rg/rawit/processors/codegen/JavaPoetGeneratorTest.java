@@ -173,9 +173,9 @@ class JavaPoetGeneratorTest {
         new JavaPoetGenerator(mockMessager).generate(List.of(tree), mockEnv);
 
         String allSource = String.join("\n", written.values());
-        assertTrue(allSource.contains("XStageCaller"), "must contain XStageCaller");
-        assertTrue(allSource.contains("YStageCaller"), "must contain YStageCaller");
-        assertTrue(allSource.contains("InvokeStageCaller"), "must contain InvokeStageCaller");
+        assertTrue(allSource.contains("XStageInvoker"), "must contain XStageInvoker");
+        assertTrue(allSource.contains("YStageInvoker"), "must contain YStageInvoker");
+        assertTrue(allSource.contains("InvokeStageInvoker"), "must contain InvokeStageInvoker");
     }
 
     @Test

@@ -1,6 +1,6 @@
 # 🌶️ Rawit
 
-> Compile-time staged invocation for Java — like currying, but with types.
+> Compile-time staged invocation for Java — fluent, type-safe call chains at compile time.
 
 Rawit is a Java 21 annotation processor that transforms your methods and constructors into
 fluent, type-safe call chains at compile time. No runtime overhead, no reflection magic —
@@ -10,7 +10,7 @@ just clean, compiler-enforced APIs generated straight into your `.class` files.
 // Before
 foo.bar(10, 20);
 
-// After @Curry
+// After @Invoker
 foo.bar().x(10).y(20).invoke();
 ```
 
@@ -18,9 +18,9 @@ foo.bar().x(10).y(20).invoke();
 
 ## ✨ Features
 
-- **`@Curry`** — turns any non-private method (instance or static) into a staged call chain ending with `.invoke()`
+- **`@Invoker`** — turns any non-private method (instance or static) into a staged call chain ending with `.invoke()`
 - **`@Constructor`** — injects a `public static constructor()` entry point for staged object construction ending with `.construct()`
-- Works on **instance methods** and **static methods** (`@Curry`), and **constructors** (`@Constructor`)
+- Works on **instance methods** and **static methods** (`@Invoker`), and **constructors** (`@Constructor`)
 - Supports **overload groups** — multiple overloads with the same name share a single entry point and branch only where their signatures diverge
 - **Zero runtime dependency** — the processor runs at compile time only
 - Operates like **Lombok** — generates inner classes and interfaces via JavaPoet, and injects the parameterless entry-point overload directly into the original `.class` file using ASM
@@ -70,17 +70,17 @@ foo.bar().x(10).y(20).invoke();
 > ```
 
 ```java
-import rg.rawit.Curry;
+import rg.rawit.Invoker;
 import rg.rawit.Constructor;
 
 public class Foo {
 
-    @Curry
+    @Invoker
     public int add(int x, int y) {
         return x + y;
     }
 
-    @Curry
+    @Invoker
     public static String greet(String name, String greeting) {
         return greeting + ", " + name + "!";
     }
@@ -124,19 +124,19 @@ Point p = Point.constructor()
 
 ## 📖 Annotations
 
-### `@Curry`
+### `@Invoker`
 
 Place on any **non-private** method (instance or static) with **at least one parameter**.
 
 ```java
-@Curry
+@Invoker
 public void sendEmail(String to, String subject, String body) { ... }
 ```
 
 The processor injects:
 - A parameterless overload `sendEmail()` on the enclosing class returning the caller type
 - A top-level caller class `SendEmail` generated in the same package as the enclosing class
-- Nested stage interfaces on `SendEmail`: `ToStageCaller`, `SubjectStageCaller`, `BodyStageCaller`, and `InvokeStageCaller`
+- Nested stage interfaces on `SendEmail`: `ToStageInvoker`, `SubjectStageInvoker`, `BodyStageInvoker`, and `InvokeStageInvoker`
 
 ```java
 mailer.sendEmail()
@@ -158,7 +158,7 @@ public User(int id, String name) { ... }
 The processor injects:
 - A `public static constructor()` method on the enclosing class
 - A generated `Constructor` class in the same package implementing all stage interfaces
-- Stage interfaces `IdStageConstructor`, `NameStageConstructor`, and `ConstructStageCaller`
+- Stage interfaces `IdStageConstructor`, `NameStageConstructor`, and `ConstructStageInvoker`
 
 ```java
 User user = User.constructor()
@@ -175,8 +175,8 @@ When multiple methods share the same name, Rawit merges them into a single entry
 branches only where their signatures diverge.
 
 ```java
-@Curry public void log(String message) { ... }
-@Curry public void log(String message, int level) { ... }
+@Invoker public void log(String message) { ... }
+@Invoker public void log(String message, int level) { ... }
 ```
 
 ```java
@@ -193,8 +193,8 @@ Rawit catches mistakes early. You'll get a clear `javac` error for:
 
 | Mistake | Error |
 |---|---|
-| `@Curry` on a zero-parameter method | `currying requires at least one parameter` |
-| `@Curry` on a `private` method | `@Curry requires at least package-private visibility` |
+| `@Invoker` on a zero-parameter method | `@Invoker requires at least one parameter` |
+| `@Invoker` on a `private` method | `@Invoker requires at least package-private visibility` |
 | `@Constructor` on a non-constructor element | `@Constructor may only target constructors` |
 | `@Constructor` on a zero-parameter constructor | `staged construction requires at least one parameter` |
 | A `bar()` overload already exists | `a parameterless overload named 'bar' already exists` |

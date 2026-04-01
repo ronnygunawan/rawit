@@ -22,7 +22,7 @@ class TerminalInterfaceSpecTest {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static AnnotatedMethod curryMethod(String returnDescriptor, List<String> exceptions) {
+    private static AnnotatedMethod invokerMethod(String returnDescriptor, List<String> exceptions) {
         return new AnnotatedMethod("com/example/Foo", "bar", false, false,
                 List.of(new Parameter("x", "I")), returnDescriptor, exceptions);
     }
@@ -38,83 +38,83 @@ class TerminalInterfaceSpecTest {
     }
 
     // -------------------------------------------------------------------------
-    // @Curry — InvokeStageCaller
+    // @Invoker — InvokeStageInvoker
     // -------------------------------------------------------------------------
 
     @Test
-    void curry_generatesInvokeStageCaller() {
-        TypeSpec spec = new TerminalInterfaceSpec(curryMethod("I", List.of())).build();
-        assertEquals("InvokeStageCaller", spec.name);
+    void invoker_generatesInvokeStageInvoker() {
+        TypeSpec spec = new TerminalInterfaceSpec(invokerMethod("I", List.of())).build();
+        assertEquals("InvokeStageInvoker", spec.name);
     }
 
     @Test
-    void curry_annotatedWithFunctionalInterface() {
-        TypeSpec spec = new TerminalInterfaceSpec(curryMethod("I", List.of())).build();
+    void invoker_annotatedWithFunctionalInterface() {
+        TypeSpec spec = new TerminalInterfaceSpec(invokerMethod("I", List.of())).build();
         String source = toSource(spec);
         assertTrue(source.contains("@FunctionalInterface"), "must carry @FunctionalInterface");
     }
 
     @Test
-    void curry_invokeMethodReturnsCorrectPrimitiveType() {
-        TypeSpec spec = new TerminalInterfaceSpec(curryMethod("I", List.of())).build();
+    void invoker_invokeMethodReturnsCorrectPrimitiveType() {
+        TypeSpec spec = new TerminalInterfaceSpec(invokerMethod("I", List.of())).build();
         String source = toSource(spec);
         assertTrue(source.contains("int invoke()"), "invoke() must return int for descriptor 'I'");
     }
 
     @Test
-    void curry_voidReturnType() {
-        TypeSpec spec = new TerminalInterfaceSpec(curryMethod("V", List.of())).build();
+    void invoker_voidReturnType() {
+        TypeSpec spec = new TerminalInterfaceSpec(invokerMethod("V", List.of())).build();
         String source = toSource(spec);
         assertTrue(source.contains("void invoke()"), "invoke() must return void for descriptor 'V'");
     }
 
     @Test
-    void curry_longReturnType() {
-        TypeSpec spec = new TerminalInterfaceSpec(curryMethod("J", List.of())).build();
+    void invoker_longReturnType() {
+        TypeSpec spec = new TerminalInterfaceSpec(invokerMethod("J", List.of())).build();
         String source = toSource(spec);
         assertTrue(source.contains("long invoke()"), "invoke() must return long for descriptor 'J'");
     }
 
     @Test
-    void curry_objectReturnType() {
+    void invoker_objectReturnType() {
         TypeSpec spec = new TerminalInterfaceSpec(
-                curryMethod("Ljava/lang/String;", List.of())).build();
+                invokerMethod("Ljava/lang/String;", List.of())).build();
         String source = toSource(spec);
         assertTrue(source.contains("String invoke()"), "invoke() must return String");
     }
 
     @Test
-    void curry_checkedExceptionsPropagated() {
+    void invoker_checkedExceptionsPropagated() {
         TypeSpec spec = new TerminalInterfaceSpec(
-                curryMethod("V", List.of("java/io/IOException"))).build();
+                invokerMethod("V", List.of("java/io/IOException"))).build();
         String source = toSource(spec);
         assertTrue(source.contains("throws IOException"), "checked exceptions must appear in throws clause");
     }
 
     @Test
-    void curry_multipleCheckedExceptions() {
+    void invoker_multipleCheckedExceptions() {
         TypeSpec spec = new TerminalInterfaceSpec(
-                curryMethod("V", List.of("java/io/IOException", "java/lang/Exception"))).build();
+                invokerMethod("V", List.of("java/io/IOException", "java/lang/Exception"))).build();
         String source = toSource(spec);
         assertTrue(source.contains("IOException"), "IOException must be in throws");
         assertTrue(source.contains("Exception"), "Exception must be in throws");
     }
 
     @Test
-    void curry_noCheckedExceptions_noThrowsClause() {
-        TypeSpec spec = new TerminalInterfaceSpec(curryMethod("V", List.of())).build();
+    void invoker_noCheckedExceptions_noThrowsClause() {
+        TypeSpec spec = new TerminalInterfaceSpec(invokerMethod("V", List.of())).build();
         String source = toSource(spec);
         assertFalse(source.contains("throws"), "no throws clause when no checked exceptions");
     }
 
     // -------------------------------------------------------------------------
-    // @Constructor — ConstructStageCaller
+    // @Constructor — ConstructStageInvoker
     // -------------------------------------------------------------------------
 
     @Test
-    void constructor_generatesConstructStageCaller() {
+    void constructor_generatesConstructStageInvoker() {
         TypeSpec spec = new TerminalInterfaceSpec(constructorMethod(List.of())).build();
-        assertEquals("ConstructStageCaller", spec.name);
+        assertEquals("ConstructStageInvoker", spec.name);
     }
 
     @Test

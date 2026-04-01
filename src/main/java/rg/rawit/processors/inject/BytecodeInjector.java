@@ -178,7 +178,7 @@ public class BytecodeInjector {
             mv.visitCode();
 
             if (isConstructorAnnotationGroup || (isConstructorGroup && !isConstructorAnnotationGroup)) {
-                // @Constructor or @Curry on constructor: public static factory() { return new CallerClass(); }
+                // @Constructor or @Invoker on constructor: public static factory() { return new CallerClass(); }
                 mv.visitTypeInsn(Opcodes.NEW, callerClassBinaryName);
                 mv.visitInsn(Opcodes.DUP);
                 mv.visitMethodInsn(Opcodes.INVOKESPECIAL, callerClassBinaryName,
@@ -186,7 +186,7 @@ public class BytecodeInjector {
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitMaxs(2, 0);
             } else if (isStatic) {
-                // Static @Curry: public static bar() { return new Bar(); }
+                // Static @Invoker: public static bar() { return new Bar(); }
                 mv.visitTypeInsn(Opcodes.NEW, callerClassBinaryName);
                 mv.visitInsn(Opcodes.DUP);
                 mv.visitMethodInsn(Opcodes.INVOKESPECIAL, callerClassBinaryName,
@@ -194,7 +194,7 @@ public class BytecodeInjector {
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitMaxs(2, 0);
             } else {
-                // Instance @Curry: public bar() { return new Bar(this); }
+                // Instance @Invoker: public bar() { return new Bar(this); }
                 mv.visitTypeInsn(Opcodes.NEW, callerClassBinaryName);
                 mv.visitInsn(Opcodes.DUP);
                 mv.visitVarInsn(Opcodes.ALOAD, 0); // load this
@@ -222,7 +222,7 @@ public class BytecodeInjector {
             final boolean isConstructorGroup = tree.group().members().stream()
                     .allMatch(m -> m.isConstructor());
             if (isConstructorGroup) {
-                // @Curry on a constructor: the entry point is named after the class (lowercased)
+                // @Invoker on a constructor: the entry point is named after the class (lowercased)
                 final String enclosingClassName = tree.group().enclosingClassName();
                 final int lastSlash = enclosingClassName.lastIndexOf('/');
                 final String simpleName = lastSlash < 0 ? enclosingClassName
@@ -238,7 +238,7 @@ public class BytecodeInjector {
             final boolean isConstructorGroup = tree.group().members().stream()
                     .allMatch(m -> m.isConstructor());
             if (isConstructorAnnotationGroup || isConstructorGroup) {
-                // @Constructor or @Curry on constructor: always public static
+                // @Constructor or @Invoker on constructor: always public static
                 return Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
             }
             // Derive access from the representative method's stored accessFlags
@@ -262,15 +262,15 @@ public class BytecodeInjector {
                 final String packagePrefix = packagePrefix(enclosing);
                 return packagePrefix + "Constructor";
             }
-            // @Curry: the Caller_Class is a top-level class in the same package as the enclosing
+            // @Invoker: the Caller_Class is a top-level class in the same package as the enclosing
             // class, named after the method in PascalCase (e.g. "Add" for method "add")
             final String groupName = tree.group().groupName();
             final String packagePrefix = packagePrefix(enclosing);
             if ("<init>".equals(groupName)) {
-                // @Curry on a constructor: use the class name + "Curry" as the caller class name
+                // @Invoker on a constructor: use the class name + "Invoker" as the caller class name
                 final int lastSlash = enclosing.lastIndexOf('/');
                 final String simpleName = lastSlash < 0 ? enclosing : enclosing.substring(lastSlash + 1);
-                return packagePrefix + simpleName + "Curry";
+                return packagePrefix + simpleName + "Invoker";
             }
             return packagePrefix + toPascalCase(groupName);
         }

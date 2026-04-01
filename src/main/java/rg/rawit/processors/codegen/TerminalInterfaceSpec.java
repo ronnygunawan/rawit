@@ -11,12 +11,12 @@ import javax.lang.model.element.Modifier;
 import java.util.List;
 
 /**
- * Builds the terminal interface {@code TypeSpec} for a curried chain.
+ * Builds the terminal interface {@code TypeSpec} for a staged invocation chain.
  *
  * <ul>
- *   <li>For {@code @Curry}: generates {@code InvokeStageCaller} with a zero-arg {@code invoke()}
+ *   <li>For {@code @Invoker}: generates {@code InvokeStageInvoker} with a zero-arg {@code invoke()}
  *       method returning the annotated method's return type.</li>
- *   <li>For {@code @Constructor}: generates {@code ConstructStageCaller} with a zero-arg
+ *   <li>For {@code @Constructor}: generates {@code ConstructStageInvoker} with a zero-arg
  *       {@code construct()} method returning the enclosing class type.</li>
  * </ul>
  *
@@ -34,32 +34,32 @@ public class TerminalInterfaceSpec {
     /**
      * Builds and returns the terminal interface {@link TypeSpec}.
      *
-     * @return the {@code InvokeStageCaller} or {@code ConstructStageCaller} interface spec
+     * @return the {@code InvokeStageInvoker} or {@code ConstructStageInvoker} interface spec
      */
     public TypeSpec build() {
         if (method.isConstructorAnnotation()) {
-            // @Constructor: use ConstructStageCaller with construct() method
-            return buildConstructStageCaller();
+            // @Constructor: use ConstructStageInvoker with construct() method
+            return buildConstructStageInvoker();
         }
-        // @Curry (including @Curry on constructors): use InvokeStageCaller with invoke() method
-        return buildInvokeStageCaller();
+        // @Invoker (including @Invoker on constructors): use InvokeStageInvoker with invoke() method
+        return buildInvokeStageInvoker();
     }
 
     // -------------------------------------------------------------------------
-    // InvokeStageCaller — for @Curry
+    // InvokeStageInvoker — for @Invoker
     // -------------------------------------------------------------------------
 
-    private TypeSpec buildInvokeStageCaller() {
+    private TypeSpec buildInvokeStageInvoker() {
         final TypeName returnType;
         if (method.isConstructor()) {
-            // @Curry on a constructor: invoke() returns the enclosing class instance
+            // @Invoker on a constructor: invoke() returns the enclosing class instance
             returnType = binaryNameToClassName(method.enclosingClassName());
         } else {
             returnType = descriptorToTypeName(method.returnTypeDescriptor());
         }
         final MethodSpec invokeMethod = buildTerminalMethod("invoke", returnType);
 
-        return TypeSpec.interfaceBuilder("InvokeStageCaller")
+        return TypeSpec.interfaceBuilder("InvokeStageInvoker")
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(FunctionalInterface.class)
                 .addMethod(invokeMethod)
@@ -67,15 +67,15 @@ public class TerminalInterfaceSpec {
     }
 
     // -------------------------------------------------------------------------
-    // ConstructStageCaller — for @Constructor
+    // ConstructStageInvoker — for @Constructor
     // -------------------------------------------------------------------------
 
-    private TypeSpec buildConstructStageCaller() {
+    private TypeSpec buildConstructStageInvoker() {
         // Return type is the enclosing class itself
         final TypeName returnType = binaryNameToClassName(method.enclosingClassName());
         final MethodSpec constructMethod = buildTerminalMethod("construct", returnType);
 
-        return TypeSpec.interfaceBuilder("ConstructStageCaller")
+        return TypeSpec.interfaceBuilder("ConstructStageInvoker")
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(FunctionalInterface.class)
                 .addMethod(constructMethod)

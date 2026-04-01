@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *       stage-interface source files — without javac overwriting the modified class file.</li>
  *   <li>Compiles the generated source files without the processor (pass 3).</li>
  *   <li>Loads the resulting {@code .class} files via {@link URLClassLoader} and uses reflection
- *       to exercise the full curried chain, asserting that the result equals direct invocation.</li>
+ *       to exercise the full invoker chain, asserting that the result equals direct invocation.</li>
  * </ol>
  *
  * <p>Validates: Requirements 6.6, 8.1, 8.2, 12.4, 15, 16, 19.3, 19.4
@@ -209,17 +209,17 @@ class RawitAnnotationProcessorIntegrationTest {
     }
 
     // =========================================================================
-    // Test 1 — Instance method: @Curry on int add(int x, int y)
+    // Test 1 — Instance method: @Invoker on int add(int x, int y)
     // Validates: Requirements 6.6, 8.1, 8.2
     // =========================================================================
 
     @Test
-    void instanceMethod_curryChain_equalsDirectInvocation(@TempDir final Path outputDir)
+    void instanceMethod_invokerChain_equalsDirectInvocation(@TempDir final Path outputDir)
             throws Exception {
         final String source =
-                "import rg.rawit.Curry;\n" +
+                "import rg.rawit.Invoker;\n" +
                 "public class AddInstance {\n" +
-                "    @Curry\n" +
+                "    @Invoker\n" +
                 "    public int add(int x, int y) { return x + y; }\n" +
                 "}\n";
 
@@ -243,17 +243,17 @@ class RawitAnnotationProcessorIntegrationTest {
     }
 
     // =========================================================================
-    // Test 2 — Static method: @Curry on static int add(int x, int y)
+    // Test 2 — Static method: @Invoker on static int add(int x, int y)
     // Validates: Requirements 6.6, 8.1, 8.2
     // =========================================================================
 
     @Test
-    void staticMethod_curryChain_equalsDirectInvocation(@TempDir final Path outputDir)
+    void staticMethod_invokerChain_equalsDirectInvocation(@TempDir final Path outputDir)
             throws Exception {
         final String source =
-                "import rg.rawit.Curry;\n" +
+                "import rg.rawit.Invoker;\n" +
                 "public class AddStatic {\n" +
-                "    @Curry\n" +
+                "    @Invoker\n" +
                 "    public static int add(int x, int y) { return x + y; }\n" +
                 "}\n";
 
@@ -275,19 +275,19 @@ class RawitAnnotationProcessorIntegrationTest {
     }
 
     // =========================================================================
-    // Test 3 — Constructor with @Curry: parameterless overload injected
+    // Test 3 — Constructor with @Invoker: parameterless overload injected
     // Validates: Requirements 6.6, 8.1, 8.2
     // =========================================================================
 
     @Test
-    void constructorWithCurry_curryChain_equalsDirectInvocation(@TempDir final Path outputDir)
+    void constructorWithInvoker_invokerChain_equalsDirectInvocation(@TempDir final Path outputDir)
             throws Exception {
         final String source =
-                "import rg.rawit.Curry;\n" +
+                "import rg.rawit.Invoker;\n" +
                 "public class PointCurry {\n" +
                 "    public final int x;\n" +
                 "    public final int y;\n" +
-                "    @Curry\n" +
+                "    @Invoker\n" +
                 "    public PointCurry(int x, int y) { this.x = x; this.y = y; }\n" +
                 "}\n";
 
@@ -356,7 +356,7 @@ class RawitAnnotationProcessorIntegrationTest {
     }
 
     // =========================================================================
-    // Test 5 — Overload group with branching: two @Curry methods with same name
+    // Test 5 — Overload group with branching: two @Invoker methods with same name
     // Validates: Requirements 8.1, 8.2
     // =========================================================================
 
@@ -364,11 +364,11 @@ class RawitAnnotationProcessorIntegrationTest {
     void overloadGroupWithBranching_bothBranchesWork(@TempDir final Path outputDir)
             throws Exception {
         final String source =
-                "import rg.rawit.Curry;\n" +
+                "import rg.rawit.Invoker;\n" +
                 "public class Calculator {\n" +
-                "    @Curry\n" +
+                "    @Invoker\n" +
                 "    public int compute(int x, int y) { return x + y; }\n" +
-                "    @Curry\n" +
+                "    @Invoker\n" +
                 "    public int compute(int x, String label) { return x + label.length(); }\n" +
                 "}\n";
 
@@ -401,11 +401,11 @@ class RawitAnnotationProcessorIntegrationTest {
     @Test
     void prefixOverload_bothInvokePathsWork(@TempDir final Path outputDir) throws Exception {
         final String source =
-                "import rg.rawit.Curry;\n" +
+                "import rg.rawit.Invoker;\n" +
                 "public class Adder {\n" +
-                "    @Curry\n" +
+                "    @Invoker\n" +
                 "    public int bar(int x, int y) { return x + y; }\n" +
-                "    @Curry\n" +
+                "    @Invoker\n" +
                 "    public int bar(int x, int y, int z) { return x + y + z; }\n" +
                 "}\n";
 

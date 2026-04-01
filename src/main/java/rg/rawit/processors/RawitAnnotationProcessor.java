@@ -1,7 +1,5 @@
 package rg.rawit.processors;
 
-import rg.rawit.Curry;
-import rg.rawit.Constructor;
 import rg.rawit.processors.codegen.JavaPoetGenerator;
 import rg.rawit.processors.inject.BytecodeInjector;
 import rg.rawit.processors.inject.OverloadResolver;
@@ -23,11 +21,11 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Annotation processor for {@code @Curry} and {@code @Constructor}.
+ * Annotation processor for {@code @Invoker} and {@code @Constructor}.
  *
  * <p>Pipeline per round:
  * <ol>
- *   <li>Collect elements annotated with {@code @Curry} and {@code @Constructor}.</li>
+ *   <li>Collect elements annotated with {@code @Invoker} and {@code @Constructor}.</li>
  *   <li>Validate each element via {@link ElementValidator}; skip invalid elements.</li>
  *   <li>Build {@link AnnotatedMethod} models from valid elements.</li>
  *   <li>Group into {@link OverloadGroup} instances by enclosing class + method name.</li>
@@ -36,10 +34,10 @@ import java.util.*;
  *   <li>Inject parameterless overloads via {@link BytecodeInjector} once per enclosing class.</li>
  * </ol>
  */
-@SupportedOptions("curry.debug")
+@SupportedOptions("invoker.debug")
 public class RawitAnnotationProcessor extends AbstractProcessor {
 
-    private static final String CURRY_ANNOTATION_FQN = "rg.rawit.Curry";
+    private static final String INVOKER_ANNOTATION_FQN = "rg.rawit.Invoker";
     private static final String CONSTRUCTOR_ANNOTATION_FQN = "rg.rawit.Constructor";
 
     private Messager messager;
@@ -60,7 +58,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
 
     @Override
     public final Set<String> getSupportedAnnotationTypes() {
-        return Set.of(CURRY_ANNOTATION_FQN, CONSTRUCTOR_ANNOTATION_FQN);
+        return Set.of(INVOKER_ANNOTATION_FQN, CONSTRUCTOR_ANNOTATION_FQN);
     }
 
     @Override
@@ -82,7 +80,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
 
         for (final TypeElement annotation : annotations) {
             final String fqn = annotation.getQualifiedName().toString();
-            if (!CURRY_ANNOTATION_FQN.equals(fqn) && !CONSTRUCTOR_ANNOTATION_FQN.equals(fqn)) {
+            if (!INVOKER_ANNOTATION_FQN.equals(fqn) && !CONSTRUCTOR_ANNOTATION_FQN.equals(fqn)) {
                 continue;
             }
 
@@ -101,7 +99,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                     validMethods.add(model);
                     if (debug) {
                         messager.printMessage(Diagnostic.Kind.NOTE,
-                                "[curry.debug] Validated element: "
+                                "[invoker.debug] Validated element: "
                                         + model.enclosingClassName() + "#" + model.methodName()
                                         + " params=" + model.parameters().size());
                     }
@@ -115,19 +113,19 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
 
         // --- Stage 2: Group into OverloadGroups ---
         // Key: enclosingClassName + "\0" + groupName + "\0" + annotationKind
-        // The annotation kind is included so that a @Curry constructor and a @Constructor
+        // The annotation kind is included so that a @Invoker constructor and a @Constructor
         // constructor in the same class are NOT merged into the same group (they have different
         // entry-point names, stage interface suffixes, and injection strategies).
         final Map<String, List<AnnotatedMethod>> groupMap = new LinkedHashMap<>();
         for (final AnnotatedMethod m : validMethods) {
-            final String annotationKind = m.isConstructorAnnotation() ? "CONSTRUCTOR" : "CURRY";
+            final String annotationKind = m.isConstructorAnnotation() ? "CONSTRUCTOR" : "INVOKER";
             final String key = m.enclosingClassName() + "\0" + m.methodName() + "\0" + annotationKind;
             groupMap.computeIfAbsent(key, k -> new ArrayList<>()).add(m);
         }
 
         if (debug) {
             messager.printMessage(Diagnostic.Kind.NOTE,
-                    "[curry.debug] Formed " + groupMap.size() + " overload group(s)");
+                    "[invoker.debug] Formed " + groupMap.size() + " overload group(s)");
         }
 
         // --- Stage 3: Build MergeTrees ---
@@ -146,7 +144,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                 // Conflict detected — MergeTreeBuilder already emitted ERROR
                 if (debug) {
                     messager.printMessage(Diagnostic.Kind.NOTE,
-                            "[curry.debug] Skipping group due to merge conflict: "
+                            "[invoker.debug] Skipping group due to merge conflict: "
                                     + first.enclosingClassName() + "#" + first.methodName());
                 }
                 continue;
@@ -155,7 +153,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
             allTrees.add(tree);
             if (debug) {
                 messager.printMessage(Diagnostic.Kind.NOTE,
-                        "[curry.debug] Built MergeTree for group: "
+                        "[invoker.debug] Built MergeTree for group: "
                                 + first.enclosingClassName() + "#" + first.methodName());
             }
         }
@@ -176,7 +174,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
 
         if (debug) {
             messager.printMessage(Diagnostic.Kind.NOTE,
-                    "[curry.debug] Generating source files for " + allTrees.size() + " tree(s)");
+                    "[invoker.debug] Generating source files for " + allTrees.size() + " tree(s)");
         }
         javaPoetGenerator.generate(allTrees, processingEnv);
 
@@ -193,7 +191,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
             if (classFilePath.isEmpty()) {
                 if (debug) {
                     messager.printMessage(Diagnostic.Kind.NOTE,
-                            "[curry.debug] .class file not found for "
+                            "[invoker.debug] .class file not found for "
                                     + enclosingClassName.replace('/', '.')
                                     + " — skipping bytecode injection (run a two-pass compile for injection)");
                 }
@@ -202,7 +200,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
 
             if (debug) {
                 messager.printMessage(Diagnostic.Kind.NOTE,
-                        "[curry.debug] Injecting overloads into: " + classFilePath.get());
+                        "[invoker.debug] Injecting overloads into: " + classFilePath.get());
             }
 
             bytecodeInjector.inject(classFilePath.get(), classTrees, processingEnv);
@@ -389,10 +387,10 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     }
 
     /**
-     * Returns {@code true} when the {@code curry.debug} processor option is set to {@code "true"}.
+     * Returns {@code true} when the {@code invoker.debug} processor option is set to {@code "true"}.
      */
     private boolean isDebugEnabled() {
-        final String opt = processingEnv.getOptions().get("curry.debug");
+        final String opt = processingEnv.getOptions().get("invoker.debug");
         return "true".equalsIgnoreCase(opt);
     }
 }

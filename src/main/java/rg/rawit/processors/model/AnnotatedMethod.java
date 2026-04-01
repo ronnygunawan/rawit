@@ -3,7 +3,7 @@ package rg.rawit.processors.model;
 import java.util.List;
 
 /**
- * Immutable model of a validated element annotated with {@code @Curry} or {@code @Constructor}.
+ * Immutable model of a validated element annotated with {@code @Invoker} or {@code @Constructor}.
  *
  * <p>Captures everything needed for code generation and bytecode injection, with no dependency
  * on {@code javax.lang.model} types after construction.
@@ -13,7 +13,7 @@ import java.util.List;
  * @param isStatic             {@code true} if the method is declared {@code static}
  * @param isConstructor        {@code true} if this represents a constructor
  * @param isConstructorAnnotation {@code true} if annotated with {@code @Constructor} (as opposed
- *                             to {@code @Curry}); only meaningful when {@code isConstructor} is
+ *                             to {@code @Invoker}); only meaningful when {@code isConstructor} is
  *                             {@code true}
  * @param parameters           ordered list of parameters
  * @param returnTypeDescriptor JVM return type descriptor, e.g. {@code "I"} or {@code "V"}

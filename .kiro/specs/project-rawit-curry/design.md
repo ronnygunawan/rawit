@@ -9,8 +9,8 @@ generating a separate companion class, it injects new members directly into the 
 
 Two annotations are provided:
 
-- `@Curry` — placed on a method or constructor. Injects a parameterless overload and a staged
-  curried call chain into the original class. The chain ends with `.invoke()`.
+- `@Invoker` — placed on a method or constructor. Injects a parameterless overload and a staged
+  invocation call chain into the original class. The chain ends with `.invoke()`.
 - `@Constructor` — placed on a constructor. Injects a `public static constructor()` entry point
   and a staged construction chain. The chain ends with `.construct()`.
 
@@ -19,7 +19,7 @@ Two annotations are provided:
 ```java
 // Source
 class Foo {
-    @Curry
+    @Invoker
     public int add(int x, int y) { return x + y; }
 }
 
@@ -62,7 +62,7 @@ flowchart TD
 ```
 
 The processor runs inside `javac`. It uses JavaPoet to generate `.java` source files for all
-generated types (Caller_Class, Stage_Interfaces, InvokeStageCaller, ConstructStageCaller), which
+generated types (Caller_Class, Stage_Interfaces, InvokeStageInvoker, ConstructStageInvoker), which
 are written via the `Filer` API and compiled by `javac` in the same round. The only bytecode
 manipulation performed by ASM is injecting the parameterless overload method into the *original*
 `.class` file — since the original source cannot be modified, this narrow injection still requires
@@ -71,8 +71,8 @@ ASM.
 ### Key Design Decisions
 
 1. **JavaPoet for generated types** — JavaPoet produces readable, maintainable Java source for all
-   generated inner classes and interfaces (Caller_Class, Stage_Interfaces, InvokeStageCaller,
-   ConstructStageCaller). The `Filer` API writes these `.java` files to the build output, and
+   generated inner classes and interfaces (Caller_Class, Stage_Interfaces, InvokeStageInvoker,
+   ConstructStageInvoker). The `Filer` API writes these `.java` files to the build output, and
    `javac` compiles them in the same round. This matches standard annotation-processor practice and
    makes the generated code inspectable.
 2. **ASM for parameterless overload injection only** — The original source file cannot be modified,
@@ -93,12 +93,12 @@ ASM.
 
 ```
 rawit/
-  Curry.java                        — @Curry annotation
+  Invoker.java                      — @Invoker annotation
   Constructor.java                  — @Constructor annotation (to be created)
   processors/
     RawitAnnotationProcessor.java   — AbstractProcessor entry point (handles both annotations)
     validation/
-      ElementValidator.java         — Validates @Curry and @Constructor usage rules
+      ElementValidator.java         — Validates @Invoker and @Constructor usage rules
     model/
       AnnotatedMethod.java          — Immutable model of a validated annotated element
       OverloadGroup.java            — A named group of AnnotatedMethods sharing a name
@@ -108,9 +108,9 @@ rawit/
       MergeTreeBuilder.java         — Builds a MergeTree from an OverloadGroup
     codegen/
       JavaPoetGenerator.java        — Orchestrates JavaPoet source generation for all groups
-      CallerClassSpec.java          — Builds TypeSpec for the Caller_Class using JavaPoet
+      InvokerClassSpec.java         — Builds TypeSpec for the Caller_Class using JavaPoet
       StageInterfaceSpec.java       — Builds TypeSpec for each Stage_Interface using JavaPoet
-      TerminalInterfaceSpec.java    — Builds TypeSpec for InvokeStageCaller / ConstructStageCaller
+      TerminalInterfaceSpec.java    — Builds TypeSpec for InvokeStageInvoker / ConstructStageInvoker
     inject/
       BytecodeInjector.java         — ASM injection of the parameterless overload ONLY
       OverloadResolver.java         — Resolves the .class file path from the build output dir
@@ -122,10 +122,10 @@ rawit/
 
 ### RawitAnnotationProcessor
 
-Entry point. Extends `AbstractProcessor`. Handles both `@Curry` and `@Constructor`.
+Entry point. Extends `AbstractProcessor`. Handles both `@Invoker` and `@Constructor`.
 
 ```java
-@SupportedOptions({"curry.debug"})
+@SupportedOptions({"invoker.debug"})
 public class RawitAnnotationProcessor extends AbstractProcessor {
     boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv);
 }
@@ -149,7 +149,7 @@ public class ElementValidator {
 ```
 
 Checks:
-- Element kind is `METHOD` or `CONSTRUCTOR` (for `@Curry`); `CONSTRUCTOR` only (for `@Constructor`).
+- Element kind is `METHOD` or `CONSTRUCTOR` (for `@Invoker`); `CONSTRUCTOR` only (for `@Constructor`).
 - Parameter count ≥ 1.
 - Visibility is not `private`.
 - No existing zero-parameter overload with the same name (checked against the enclosing type's
@@ -229,7 +229,7 @@ public class MergeTreeBuilder {
 ### JavaPoetGenerator
 
 Generates `.java` source files for all produced types (Caller_Class, Stage_Interfaces,
-InvokeStageCaller, ConstructStageCaller) and writes them via the `Filer` API.
+InvokeStageInvoker, ConstructStageInvoker) and writes them via the `Filer` API.
 
 ```java
 public class JavaPoetGenerator {
@@ -281,30 +281,30 @@ the injector).
 
 | Context | Convention | Example |
 |---|---|---|
-| `@Curry` stage | `<PascalParam>StageCaller` | `XStageCaller` |
-| `@Curry` terminal | `InvokeStageCaller` | `InvokeStageCaller` |
+| `@Invoker` stage | `<PascalParam>StageInvoker` | `XStageInvoker` |
+| `@Invoker` terminal | `InvokeStageInvoker` | `InvokeStageInvoker` |
 | `@Constructor` stage | `<PascalParam>StageConstructor` | `IdStageConstructor` |
-| `@Constructor` terminal | `ConstructStageCaller` | `ConstructStageCaller` |
-| Branching stage (first param diverges) | `<PascalMethod>StageCaller` | `BarStageCaller` |
+| `@Constructor` terminal | `ConstructStageInvoker` | `ConstructStageInvoker` |
+| Branching stage (first param diverges) | `<PascalMethod>StageInvoker` | `BarStageInvoker` |
 
 ### Caller Class Naming
 
 | Context | Inner class name |
 |---|---|
-| `@Curry` on method `bar` | `Bar` (PascalCase of method name) |
+| `@Invoker` on method `bar` | `Bar` (PascalCase of method name) |
 | `@Constructor` | `Constructor` (literal) |
 
 ### Generated Member Inventory
 
-For a `@Curry` on `Foo.bar(int x, int y)`:
+For a `@Invoker` on `Foo.bar(int x, int y)`:
 
 | Member | Kind | Location |
 |---|---|---|
 | `bar()` | instance method | `Foo` |
 | `Bar` | `public static` inner class | `Foo` |
-| `XStageCaller` | interface | `Foo$Bar` |
-| `YStageCaller` | interface | `Foo$Bar` |
-| `InvokeStageCaller` | interface | `Foo$Bar` |
+| `XStageInvoker` | interface | `Foo$Bar` |
+| `YStageInvoker` | interface | `Foo$Bar` |
+| `InvokeStageInvoker` | interface | `Foo$Bar` |
 
 For a `@Constructor` on `Foo(int id, String name)`:
 
@@ -314,7 +314,7 @@ For a `@Constructor` on `Foo(int id, String name)`:
 | `Constructor` | `public static` inner class | `Foo` |
 | `IdStageConstructor` | interface | `Foo$Constructor` |
 | `NameStageConstructor` | interface | `Foo$Constructor` |
-| `ConstructStageCaller` | interface | `Foo$Constructor` |
+| `ConstructStageInvoker` | interface | `Foo$Constructor` |
 
 ### Immutability Invariant
 
@@ -326,7 +326,7 @@ The following shows the JavaPoet-generated `.java` source for `Foo.Bar` with par
 
 ```java
 // Generated source — Foo.java (inner class written by JavaPoetGenerator via Filer)
-public static final class Bar implements XStageCaller {
+public static final class Bar implements XStageInvoker {
     private final Foo __instance;
 
     private Bar(Foo instance) {
@@ -334,26 +334,26 @@ public static final class Bar implements XStageCaller {
     }
 
     @Override
-    public YStageCaller x(int x) {
+    public YStageInvoker x(int x) {
         return new Bar$WithX(__instance, x);
     }
 
     @FunctionalInterface
-    public interface XStageCaller {
-        YStageCaller x(int x);
+    public interface XStageInvoker {
+        YStageInvoker x(int x);
     }
 
     @FunctionalInterface
-    public interface YStageCaller {
-        InvokeStageCaller y(int y);
+    public interface YStageInvoker {
+        InvokeStageInvoker y(int y);
     }
 
     @FunctionalInterface
-    public interface InvokeStageCaller {
+    public interface InvokeStageInvoker {
         int invoke();
     }
 
-    private static final class Bar$WithX implements YStageCaller {
+    private static final class Bar$WithX implements YStageInvoker {
         private final Foo __instance;
         private final int x;
 
@@ -363,12 +363,12 @@ public static final class Bar implements XStageCaller {
         }
 
         @Override
-        public InvokeStageCaller y(int y) {
+        public InvokeStageInvoker y(int y) {
             return new Bar$WithXY(__instance, x, y);
         }
     }
 
-    private static final class Bar$WithXY implements InvokeStageCaller {
+    private static final class Bar$WithXY implements InvokeStageInvoker {
         private final Foo __instance;
         private final int x;
         private final int y;
@@ -451,8 +451,8 @@ function buildContinuation(overloads, position):
 ### Algorithm 2: Stage Interface Name Resolution
 
 ```
-function stageInterfaceName(node, methodName, isCurry):
-    suffix = "StageCaller" if isCurry else "StageConstructor"
+function stageInterfaceName(node, methodName, isInvoker):
+    suffix = "StageInvoker" if isInvoker else "StageConstructor"
     match node:
         SharedNode(paramName, ...) -> PascalCase(paramName) + suffix
         BranchingNode at position 0 -> PascalCase(methodName) + suffix
@@ -498,8 +498,8 @@ ClassReader
 
 | Condition | Diagnostic | Code generation |
 |---|---|---|
-| `@Curry` on zero-param method/constructor | `ERROR` | Skipped |
-| `@Curry` on private method/constructor | `ERROR` | Skipped |
+| `@Invoker` on zero-param method/constructor | `ERROR` | Skipped |
+| `@Invoker` on private method/constructor | `ERROR` | Skipped |
 | `@Constructor` on non-constructor element | `ERROR` | Skipped |
 | `@Constructor` on zero-param constructor | `ERROR` | Skipped |
 | `@Constructor` on private constructor | `ERROR` | Skipped |
@@ -536,7 +536,7 @@ Each property test is tagged with a comment in the format:
 
 - `ElementValidator` — one test per validation rule (zero params, private, wrong element kind).
 - `MergeTreeBuilder` — shared prefix, branching, prefix overload, conflict detection.
-- `JavaPoetGenerator`, `CallerClassSpec`, `StageInterfaceSpec`, `TerminalInterfaceSpec` — assert
+- `JavaPoetGenerator`, `InvokerClassSpec`, `StageInterfaceSpec`, `TerminalInterfaceSpec` — assert
   on generated source strings using `JavaFile.toString()` / `TypeSpec.toString()` (see Generated
   Source Assertions below).
 - `BytecodeInjector` — load the modified `.class` via a `URLClassLoader` and reflectively verify
@@ -561,7 +561,7 @@ This validates the full pipeline end-to-end without requiring a separate Maven b
 
 ### Generated Source Assertions
 
-Unit tests for `JavaPoetGenerator`, `CallerClassSpec`, `StageInterfaceSpec`, and
+Unit tests for `JavaPoetGenerator`, `InvokerClassSpec`, `StageInterfaceSpec`, and
 `TerminalInterfaceSpec` should assert on the **actual generated Java source string** produced by
 JavaPoet — not just on the structure of the `TypeSpec` objects.
 
@@ -573,18 +573,18 @@ Example test pattern:
 
 ```java
 @Test
-void generatesXStageCallerInterface() {
+void generatesXStageInvokerInterface() {
     // given
     AnnotatedMethod method = new AnnotatedMethod("Foo", "bar", false, false,
         List.of(new Parameter("x", "I"), new Parameter("y", "I")), "V", List.of());
 
     // when
-    TypeSpec callerClass = new CallerClassSpec(method).build();
+    TypeSpec callerClass = new InvokerClassSpec(method).build();
     String source = JavaFile.builder("com.example", callerClass).build().toString();
 
     // then
-    assertThat(source).contains("public interface XStageCaller");
-    assertThat(source).contains("YStageCaller x(int x)");
+    assertThat(source).contains("public interface XStageInvoker");
+    assertThat(source).contains("YStageInvoker x(int x)");
     assertThat(source).contains("@FunctionalInterface");
 }
 ```
@@ -603,7 +603,7 @@ bridge between human-readable specifications and machine-verifiable correctness 
 ### Property 1: Valid element produces no errors
 
 *For any* method or constructor that is non-private and has at least one parameter, annotating it
-with `@Curry` or `@Constructor` (as appropriate) should cause the processor to emit zero
+with `@Invoker` or `@Constructor` (as appropriate) should cause the processor to emit zero
 `Diagnostic.Kind.ERROR` messages for that element.
 
 **Validates: Requirements 1.3, 2.3, 15.4**
@@ -612,7 +612,7 @@ with `@Curry` or `@Constructor` (as appropriate) should cause the processor to e
 
 ### Property 2: Parameterless overload is injected
 
-*For any* valid `@Curry`-annotated method named `bar` on class `Foo`, after processing, `Foo`'s
+*For any* valid `@Invoker`-annotated method named `bar` on class `Foo`, after processing, `Foo`'s
 `.class` file should contain a method named `bar` with zero parameters.
 
 **Validates: Requirements 3.1**
@@ -621,7 +621,7 @@ with `@Curry` or `@Constructor` (as appropriate) should cause the processor to e
 
 ### Property 3: Parameterless overload preserves access modifier
 
-*For any* valid `@Curry`-annotated method with a given access modifier (public, protected, or
+*For any* valid `@Invoker`-annotated method with a given access modifier (public, protected, or
 package-private), the injected parameterless overload should have the same access modifier.
 
 **Validates: Requirements 3.2, 3.4, 3.5**
@@ -630,8 +630,8 @@ package-private), the injected parameterless overload should have the same acces
 
 ### Property 4: Parameterless overload returns the Entry_Stage type
 
-*For any* valid `@Curry`-annotated method, the return type of the injected parameterless overload
-should be the first stage interface type (`<PascalParam>StageCaller` for the first parameter).
+*For any* valid `@Invoker`-annotated method, the return type of the injected parameterless overload
+should be the first stage interface type (`<PascalParam>StageInvoker` for the first parameter).
 
 **Validates: Requirements 3.3**
 
@@ -639,7 +639,7 @@ should be the first stage interface type (`<PascalParam>StageCaller` for the fir
 
 ### Property 5: Caller_Class is injected as a public static inner class
 
-*For any* valid `@Curry`-annotated method named `bar`, after processing, the enclosing class
+*For any* valid `@Invoker`-annotated method named `bar`, after processing, the enclosing class
 should contain a `public static` inner class named `Bar` (PascalCase of the method name).
 
 **Validates: Requirements 4.1**
@@ -648,8 +648,8 @@ should contain a `public static` inner class named `Bar` (PascalCase of the meth
 
 ### Property 6: Caller_Class implements all Stage_Interfaces
 
-*For any* valid `@Curry`-annotated method with N parameters, the generated Caller_Class should
-implement all N stage interfaces and the terminal `InvokeStageCaller` interface.
+*For any* valid `@Invoker`-annotated method with N parameters, the generated Caller_Class should
+implement all N stage interfaces and the terminal `InvokeStageInvoker` interface.
 
 **Validates: Requirements 4.2, 17.2**
 
@@ -696,7 +696,7 @@ method, and that method should be named `foo` and accept a single argument of th
 
 *For any* valid annotated element with parameters `[p1, p2, ..., pN]`, the stage method on the
 interface for `pi` (where i < N) should return the interface for `p(i+1)`, and the stage method
-on the interface for `pN` should return an `InvokeStageCaller` (or `ConstructStageCaller`).
+on the interface for `pN` should return an `InvokeStageInvoker` (or `ConstructStageInvoker`).
 
 **Validates: Requirements 5.3, 5.4, 18.3, 18.4**
 
@@ -704,8 +704,8 @@ on the interface for `pN` should return an `InvokeStageCaller` (or `ConstructSta
 
 ### Property 12: Terminal interface is generated
 
-*For any* valid annotated element, exactly one `InvokeStageCaller` (for `@Curry`) or
-`ConstructStageCaller` (for `@Constructor`) interface should be generated, with a single
+*For any* valid annotated element, exactly one `InvokeStageInvoker` (for `@Invoker`) or
+`ConstructStageInvoker` (for `@Constructor`) interface should be generated, with a single
 zero-argument `invoke()` or `construct()` method returning the correct type.
 
 **Validates: Requirements 5.5, 19.1, 19.2**
@@ -714,7 +714,7 @@ zero-argument `invoke()` or `construct()` method returning the correct type.
 
 ### Property 13: Stage interfaces carry @FunctionalInterface
 
-*For any* generated stage interface (both `StageCaller` and `StageConstructor` variants), the
+*For any* generated stage interface (both `StageInvoker` and `StageConstructor` variants), the
 interface should be annotated with `@FunctionalInterface`.
 
 **Validates: Requirements 5.8, 18.6**
@@ -733,7 +733,7 @@ checked exceptions in their `throws` clause.
 
 ### Property 15: Round-trip equivalence — chain invocation equals direct invocation
 
-*For any* valid `@Curry`-annotated method and any combination of argument values, calling the
+*For any* valid `@Invoker`-annotated method and any combination of argument values, calling the
 parameterless overload, chaining through all stage methods with those arguments, and calling
 `.invoke()` should produce a result equal to calling the original method directly with the same
 arguments.
@@ -748,7 +748,7 @@ should produce an instance equal to calling `new Foo(...)` directly with the sam
 
 ### Property 16: Multiple annotations produce separate Caller_Classes
 
-*For any* class with multiple `@Curry`-annotated methods with distinct names, after processing,
+*For any* class with multiple `@Invoker`-annotated methods with distinct names, after processing,
 the class should contain a separate Caller_Class for each annotated method, with no name
 collisions.
 
@@ -768,7 +768,7 @@ pass JVM bytecode verification and load without throwing `VerifyError` or `Class
 ### Property 18: Invoke idempotency — calling invoke() multiple times produces equal results
 
 *For any* valid annotated element and any set of arguments, calling `.invoke()` on the same
-`InvokeStageCaller` instance multiple times should produce equal results (assuming the underlying
+`InvokeStageInvoker` instance multiple times should produce equal results (assuming the underlying
 method is deterministic).
 
 **Validates: Requirements 8.4**
@@ -806,7 +806,7 @@ type. Parameters beyond the shared prefix should not appear in the shared stage 
 
 ### Property 22: Single parameterless overload for an overload group
 
-*For any* overload group (multiple `@Curry`-annotated methods sharing the same name), exactly one
+*For any* overload group (multiple `@Invoker`-annotated methods sharing the same name), exactly one
 parameterless overload should be injected into the enclosing class — not one per overload member.
 
 **Validates: Requirements 11.2, 20.2**
@@ -853,10 +853,10 @@ contain a `public static` inner class named exactly `Constructor`.
 
 ---
 
-### Property 27: ConstructStageCaller has a construct() method returning the enclosing type
+### Property 27: ConstructStageInvoker has a construct() method returning the enclosing type
 
 *For any* valid `@Constructor`-annotated constructor on class `Foo`, the generated
-`ConstructStageCaller` interface should declare exactly one zero-argument method named `construct()`
+`ConstructStageInvoker` interface should declare exactly one zero-argument method named `construct()`
 with return type `Foo`.
 
 **Validates: Requirements 19.2**

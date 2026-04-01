@@ -11,11 +11,11 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for {@link CallerClassSpec}.
+ * Unit tests for {@link InvokerClassSpec}.
  *
  * <p>Assertions are made on the generated Java source string produced by JavaPoet.
  */
-class CallerClassSpecTest {
+class InvokerClassSpecTest {
 
     // -------------------------------------------------------------------------
     // Helpers
@@ -63,14 +63,14 @@ class CallerClassSpecTest {
     @Test
     void callerClassNamedAfterMethodInPascalCase() {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         assertEquals("Bar", spec.name);
     }
 
     @Test
     void callerClassNamedConstructorForConstructorAnnotation() {
         AnnotatedMethod m = constructorMethod(p("id", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         assertEquals("Constructor", spec.name);
     }
 
@@ -81,7 +81,7 @@ class CallerClassSpecTest {
     @Test
     void callerClassIsPublicStatic() {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
         assertTrue(source.contains("public static final class Bar"), "must be public static final");
     }
@@ -89,7 +89,7 @@ class CallerClassSpecTest {
     @Test
     void callerClassCarriesGeneratedAnnotation() {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
         assertTrue(source.contains("@Generated"), "must carry @Generated annotation");
         assertTrue(source.contains("rg.rawit.processors.RawitAnnotationProcessor"),
@@ -103,7 +103,7 @@ class CallerClassSpecTest {
     @Test
     void instanceMethod_hasPrivateFinalInstanceField() {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
         assertTrue(source.contains("private final Foo __instance"), "must have private final __instance field");
     }
@@ -111,7 +111,7 @@ class CallerClassSpecTest {
     @Test
     void staticMethod_noInstanceField() {
         AnnotatedMethod m = staticMethod("bar", "V", p("x", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
         assertFalse(source.contains("__instance"), "static method must not have __instance field");
     }
@@ -119,7 +119,7 @@ class CallerClassSpecTest {
     @Test
     void accumulatorClass_hasPrivateFinalFields() {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"), p("y", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
         // The accumulator Bar$WithX should have private final int x
         assertTrue(source.contains("private final int x"), "accumulator must have private final int x");
@@ -132,13 +132,13 @@ class CallerClassSpecTest {
     @Test
     void callerClassImplementsFirstStageInterface() {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"), p("y", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
-        // The Caller_Class no longer implements the first stage interface directly
+        // The Invoker_Class no longer implements the first stage interface directly
         // (to avoid cyclic inheritance when written as a top-level class).
         // Instead, it exposes the first stage method directly.
-        assertTrue(source.contains("public YStageCaller x(int x)"),
-                "must have the first stage method x(int x) returning YStageCaller");
+        assertTrue(source.contains("public YStageInvoker x(int x)"),
+                "must have the first stage method x(int x) returning YStageInvoker");
     }
 
     // -------------------------------------------------------------------------
@@ -148,11 +148,11 @@ class CallerClassSpecTest {
     @Test
     void callerClassContainsNestedStageInterfaces() {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"), p("y", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
-        assertTrue(source.contains("XStageCaller"), "must contain XStageCaller interface");
-        assertTrue(source.contains("YStageCaller"), "must contain YStageCaller interface");
-        assertTrue(source.contains("InvokeStageCaller"), "must contain InvokeStageCaller interface");
+        assertTrue(source.contains("XStageInvoker"), "must contain XStageInvoker interface");
+        assertTrue(source.contains("YStageInvoker"), "must contain YStageInvoker interface");
+        assertTrue(source.contains("InvokeStageInvoker"), "must contain InvokeStageInvoker interface");
     }
 
     // -------------------------------------------------------------------------
@@ -162,7 +162,7 @@ class CallerClassSpecTest {
     @Test
     void instanceMethod_invokeBodyDelegatesToCapturedInstance() {
         AnnotatedMethod m = instanceMethod("bar", "I", List.of(), p("x", "I"), p("y", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
         assertTrue(source.contains("__instance.bar(x, y)"), "invoke() must delegate to captured instance");
     }
@@ -170,7 +170,7 @@ class CallerClassSpecTest {
     @Test
     void instanceMethod_voidReturn_invokeBodyNoReturn() {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
         // void invoke() should call without return
         assertTrue(source.contains("__instance.bar(x)"), "void invoke() must call the method");
@@ -183,7 +183,7 @@ class CallerClassSpecTest {
     @Test
     void staticMethod_invokeBodyDelegatesToStaticCall() {
         AnnotatedMethod m = staticMethod("bar", "I", p("x", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
         assertTrue(source.contains("Foo.bar(x)"), "invoke() must delegate to static method");
     }
@@ -195,7 +195,7 @@ class CallerClassSpecTest {
     @Test
     void constructor_constructBodyUsesNew() {
         AnnotatedMethod m = constructorMethod(p("id", "I"), p("name", "Ljava/lang/String;"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
         assertTrue(source.contains("new Foo(id, name)"), "construct() must use new Foo(...)");
     }
@@ -207,7 +207,7 @@ class CallerClassSpecTest {
     @Test
     void checkedExceptionsPropagatedToStageMethods() {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of("java/io/IOException"), p("x", "I"));
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
         assertTrue(source.contains("throws IOException"), "checked exceptions must appear in stage methods");
     }

@@ -14,11 +14,11 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Property-based tests for {@link CallerClassSpec}.
+ * Property-based tests for {@link InvokerClassSpec}.
  *
  * <p>Each property runs a minimum of 100 iterations via jqwik.
  */
-class CallerClassSpecPropertyTest {
+class InvokerClassSpecPropertyTest {
 
     // -------------------------------------------------------------------------
     // Arbitraries
@@ -72,8 +72,30 @@ class CallerClassSpecPropertyTest {
     }
 
     // -------------------------------------------------------------------------
+    // Property 2: Caller_Class name is unchanged
+    // Feature: curry-to-invoker-rename, Property 2: Caller_Class name is unchanged
+    // -------------------------------------------------------------------------
+
+    /**
+     * Validates: Requirements 8.3, 9.x
+     */
+    @Property(tries = 100)
+    void property2_callerClassNameIsUnchanged(
+            @ForAll("methodName") String name,
+            @ForAll("paramList") List<Parameter> params
+    ) {
+        AnnotatedMethod m = new AnnotatedMethod("com/example/Foo", name, false, false,
+                params, "V", List.of());
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
+
+        String expectedName = toPascalCase(name);
+        assertEquals(expectedName, spec.name,
+                "Invoker_Class must be named after the method in PascalCase (unchanged by rename)");
+    }
+
+    // -------------------------------------------------------------------------
     // Property 5: Caller_Class is injected as a public static inner class
-    // Feature: project-rawit-curry, Property 5: Caller_Class is injected as a public static inner class
+    // Feature: curry-to-invoker-rename, Property 5: Caller_Class is injected as a public static inner class
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
@@ -83,7 +105,7 @@ class CallerClassSpecPropertyTest {
     ) {
         AnnotatedMethod m = new AnnotatedMethod("com/example/Foo", name, false, false,
                 params, "V", List.of());
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
 
         String source = toSource(spec);
         String expectedName = toPascalCase(name);
@@ -95,7 +117,7 @@ class CallerClassSpecPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 6: Caller_Class implements all Stage_Interfaces
-    // Feature: project-rawit-curry, Property 6: Caller_Class implements all Stage_Interfaces
+    // Feature: curry-to-invoker-rename, Property 6: Caller_Class implements all Stage_Interfaces
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
@@ -105,14 +127,14 @@ class CallerClassSpecPropertyTest {
     ) {
         AnnotatedMethod m = new AnnotatedMethod("com/example/Foo", name, false, false,
                 params, "V", List.of());
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
 
-        // The Caller_Class no longer implements the first stage interface directly
+        // The Invoker_Class no longer implements the first stage interface directly
         // (to avoid cyclic inheritance when written as a top-level class).
         // Instead, it exposes the first stage method directly.
         String firstParamName = params.get(0).name();
-        // The Caller_Class should have a public method named after the first parameter
+        // The Invoker_Class should have a public method named after the first parameter
         assertTrue(source.contains("public") && source.contains(firstParamName + "("),
                 "Caller_Class must have the first stage method " + firstParamName + "()");
     }
@@ -124,22 +146,22 @@ class CallerClassSpecPropertyTest {
     ) {
         AnnotatedMethod m = new AnnotatedMethod("com/example/Foo", name, false, false,
                 params, "V", List.of());
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
 
         // All stage interfaces must be present as nested types
         for (Parameter p : params) {
-            String ifaceName = toPascalCase(p.name()) + "StageCaller";
+            String ifaceName = toPascalCase(p.name()) + "StageInvoker";
             assertTrue(source.contains(ifaceName),
                     "Caller_Class must contain stage interface " + ifaceName);
         }
-        assertTrue(source.contains("InvokeStageCaller"),
-                "Caller_Class must contain InvokeStageCaller");
+        assertTrue(source.contains("InvokeStageInvoker"),
+                "Caller_Class must contain InvokeStageInvoker");
     }
 
     // -------------------------------------------------------------------------
     // Property 7: All Caller_Class fields are private and final
-    // Feature: project-rawit-curry, Property 7: All Caller_Class fields are private and final
+    // Feature: curry-to-invoker-rename, Property 7: All Caller_Class fields are private and final
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
@@ -149,7 +171,7 @@ class CallerClassSpecPropertyTest {
     ) {
         AnnotatedMethod m = new AnnotatedMethod("com/example/Foo", name, false, false,
                 params, "V", List.of());
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
 
         // Check top-level Caller_Class fields
         for (FieldSpec field : spec.fieldSpecs) {
@@ -167,7 +189,7 @@ class CallerClassSpecPropertyTest {
     ) {
         AnnotatedMethod m = new AnnotatedMethod("com/example/Foo", name, false, false,
                 params, "V", List.of());
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
 
         // Check all nested accumulator classes
         for (TypeSpec nested : spec.typeSpecs) {
@@ -184,7 +206,7 @@ class CallerClassSpecPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 8: Caller_Class carries the @Generated annotation
-    // Feature: project-rawit-curry, Property 8: Caller_Class carries the @Generated annotation
+    // Feature: curry-to-invoker-rename, Property 8: Caller_Class carries the @Generated annotation
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
@@ -194,7 +216,7 @@ class CallerClassSpecPropertyTest {
     ) {
         AnnotatedMethod m = new AnnotatedMethod("com/example/Foo", name, false, false,
                 params, "V", List.of());
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
 
         assertTrue(source.contains("@Generated"), "Caller_Class must carry @Generated");
@@ -209,7 +231,7 @@ class CallerClassSpecPropertyTest {
         // Use isConstructorAnnotation=true to indicate @Constructor annotation
         AnnotatedMethod m = new AnnotatedMethod("com/example/Foo", "<init>", false, true, true,
                 params, "V", List.of(), 0x0001);
-        TypeSpec spec = new CallerClassSpec(linearTree(m)).build();
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
 
         assertEquals("Constructor", spec.name, "Constructor_Caller_Class must be named Constructor");

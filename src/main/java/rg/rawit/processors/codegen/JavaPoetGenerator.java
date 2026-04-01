@@ -14,8 +14,8 @@ import java.util.List;
 /**
  * Orchestrates JavaPoet source generation for all {@link MergeTree}s.
  *
- * <p>For each tree, delegates to {@link CallerClassSpec} to build the {@code TypeSpec} for the
- * Caller_Class (which already contains nested stage interfaces and terminal interfaces), then
+ * <p>For each tree, delegates to {@link InvokerClassSpec} to build the {@code TypeSpec} for the
+ * Invoker_Class (which already contains nested stage interfaces and terminal interfaces), then
  * writes the result via {@code JavaFile.builder(...).build().writeTo(env.getFiler())}.
  *
  * <p>If the {@link Filer} throws a {@link javax.annotation.processing.FilerException} (file
@@ -44,12 +44,12 @@ public class JavaPoetGenerator {
     }
 
     private void generateTree(final MergeTree tree, final Filer filer) {
-        final TypeSpec callerClass = new CallerClassSpec(tree).build();
+        final TypeSpec callerClass = new InvokerClassSpec(tree).build();
         final String packageName = resolvePackageName(tree.group().enclosingClassName());
 
         // Write the Caller_Class as a top-level class:
         // 1. Strip the 'static' modifier (not valid for top-level classes)
-        // 2. Qualify superinterface names with the class name (e.g. XStageCaller → Add.XStageCaller)
+        // 2. Qualify superinterface names with the class name (e.g. XStageInvoker → Add.XStageInvoker)
         //    because a top-level class cannot reference its own nested interfaces by simple name
         //    in the 'implements' clause.
         final TypeSpec callerAsTopLevel = asTopLevelClass(callerClass);

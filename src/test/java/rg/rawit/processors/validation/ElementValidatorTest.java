@@ -97,16 +97,16 @@ class ElementValidatorTest {
     }
 
     // =========================================================================
-    // Requirement 1.1 — @Curry on zero-param method → ERROR
+    // Requirement 1.1 — @Invoker on zero-param method → ERROR
     // =========================================================================
 
     @Test
-    void curry_zeroParamMethod_emitsError() {
-        // Req 1.1: @Curry on a method with zero parameters must produce an ERROR
+    void invoker_zeroParamMethod_emitsError() {
+        // Req 1.1: @Invoker on a method with zero parameters must produce an ERROR
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class ZeroParamMethod {
-                    @Curry
+                    @Invoker
                     public void noArgs() {}
                 }
                 """;
@@ -118,16 +118,16 @@ class ElementValidatorTest {
     }
 
     // =========================================================================
-    // Requirement 1.2 — @Curry on private method → ERROR
+    // Requirement 1.2 — @Invoker on private method → ERROR
     // =========================================================================
 
     @Test
-    void curry_privateMethod_emitsError() {
-        // Req 1.2: @Curry on a private method must produce an ERROR
+    void invoker_privateMethod_emitsError() {
+        // Req 1.2: @Invoker on a private method must produce an ERROR
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class PrivateMethod {
-                    @Curry
+                    @Invoker
                     private void secret(int x) {}
                 }
                 """;
@@ -139,16 +139,16 @@ class ElementValidatorTest {
     }
 
     // =========================================================================
-    // Requirement 2.1 — @Curry on zero-param constructor → ERROR
+    // Requirement 2.1 — @Invoker on zero-param constructor → ERROR
     // =========================================================================
 
     @Test
-    void curry_zeroParamConstructor_emitsError() {
-        // Req 2.1: @Curry on a constructor with zero parameters must produce an ERROR
+    void invoker_zeroParamConstructor_emitsError() {
+        // Req 2.1: @Invoker on a constructor with zero parameters must produce an ERROR
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class ZeroParamCtor {
-                    @Curry
+                    @Invoker
                     public ZeroParamCtor() {}
                 }
                 """;
@@ -160,16 +160,16 @@ class ElementValidatorTest {
     }
 
     // =========================================================================
-    // Requirement 2.2 — @Curry on private constructor → ERROR
+    // Requirement 2.2 — @Invoker on private constructor → ERROR
     // =========================================================================
 
     @Test
-    void curry_privateConstructor_emitsError() {
-        // Req 2.2: @Curry on a private constructor must produce an ERROR
+    void invoker_privateConstructor_emitsError() {
+        // Req 2.2: @Invoker on a private constructor must produce an ERROR
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class PrivateCtor {
-                    @Curry
+                    @Invoker
                     private PrivateCtor(int x) {}
                 }
                 """;
@@ -251,16 +251,16 @@ class ElementValidatorTest {
     // =========================================================================
 
     @Test
-    void curry_conflictingZeroParamOverload_emitsError() {
+    void invoker_conflictingZeroParamOverload_emitsError() {
         // Req 3.7 / 13.1: If a zero-param method with the same name already exists,
-        // @Curry must emit an ERROR about the naming conflict.
+        // @Invoker must emit an ERROR about the naming conflict.
         String source = """
-                import rg.rawit.Curry;
+                import rg.rawit.Invoker;
                 public class ConflictingOverload {
-                    // This zero-param method conflicts with what @Curry would inject
+                    // This zero-param method conflicts with what @Invoker would inject
                     public ConflictingOverload bar() { return this; }
 
-                    @Curry
+                    @Invoker
                     public int bar(int x) { return x; }
                 }
                 """;
@@ -272,24 +272,24 @@ class ElementValidatorTest {
     }
 
     // =========================================================================
-    // Happy path — valid @Curry method produces no errors
+    // Happy path — valid @Invoker method produces no errors
     // =========================================================================
 
     @Test
-    void curry_validMethod_noErrors() {
-        // Req 1.3: A valid @Curry method (non-private, ≥1 param) must produce no errors
+    void invoker_validMethod_noErrors() {
+        // Req 1.3: A valid @Invoker method (non-private, ≥1 param) must produce no errors
         String source = """
-                import rg.rawit.Curry;
-                public class ValidCurryMethod {
-                    @Curry
+                import rg.rawit.Invoker;
+                public class ValidInvokerMethod {
+                    @Invoker
                     public int add(int x, int y) { return x + y; }
                 }
                 """;
 
-        List<Diagnostic<? extends JavaFileObject>> diags = compile("ValidCurryMethod", source);
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("ValidInvokerMethod", source);
 
         assertTrue(errors(diags).isEmpty(),
-                "Expected no errors for a valid @Curry method, got: " + errors(diags));
+                "Expected no errors for a valid @Invoker method, got: " + errors(diags));
     }
 
     // =========================================================================

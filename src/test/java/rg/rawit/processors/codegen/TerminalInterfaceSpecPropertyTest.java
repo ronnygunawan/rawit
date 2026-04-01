@@ -49,7 +49,7 @@ class TerminalInterfaceSpecPropertyTest {
     }
 
     @Provide
-    Arbitrary<AnnotatedMethod> anyCurryMethod() {
+    Arbitrary<AnnotatedMethod> anyInvokerMethod() {
         return Combinators.combine(anyReturnDescriptor(), anyCheckedExceptions())
                 .as((ret, exs) -> new AnnotatedMethod(
                         "com/example/Foo", "bar", false, false,
@@ -69,15 +69,15 @@ class TerminalInterfaceSpecPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 12: Terminal interface is generated
-    // Feature: project-rawit-curry, Property 12: Terminal interface is generated
+    // Feature: curry-to-invoker-rename, Property 12: Terminal interface is generated
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
-    void property12_curryTerminalInterfaceIsGenerated(@ForAll("anyCurryMethod") AnnotatedMethod method) {
+    void property12_invokerTerminalInterfaceIsGenerated(@ForAll("anyInvokerMethod") AnnotatedMethod method) {
         TypeSpec spec = new TerminalInterfaceSpec(method).build();
 
         assertNotNull(spec, "terminal interface must be generated");
-        assertEquals("InvokeStageCaller", spec.name, "must be named InvokeStageCaller for @Curry");
+        assertEquals("InvokeStageInvoker", spec.name, "must be named InvokeStageInvoker for @Invoker");
 
         String source = toSource(spec);
         assertTrue(source.contains("invoke()"), "must declare invoke() method");
@@ -88,7 +88,7 @@ class TerminalInterfaceSpecPropertyTest {
         TypeSpec spec = new TerminalInterfaceSpec(method).build();
 
         assertNotNull(spec, "terminal interface must be generated");
-        assertEquals("ConstructStageCaller", spec.name, "must be named ConstructStageCaller for @Constructor");
+        assertEquals("ConstructStageInvoker", spec.name, "must be named ConstructStageInvoker for @Constructor");
 
         String source = toSource(spec);
         assertTrue(source.contains("construct()"), "must declare construct() method");
@@ -96,15 +96,15 @@ class TerminalInterfaceSpecPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 13: Stage interfaces carry @FunctionalInterface
-    // Feature: project-rawit-curry, Property 13: Stage interfaces carry @FunctionalInterface
+    // Feature: curry-to-invoker-rename, Property 13: Stage interfaces carry @FunctionalInterface
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
-    void property13_curryTerminalCarriesFunctionalInterface(@ForAll("anyCurryMethod") AnnotatedMethod method) {
+    void property13_invokerTerminalCarriesFunctionalInterface(@ForAll("anyInvokerMethod") AnnotatedMethod method) {
         TypeSpec spec = new TerminalInterfaceSpec(method).build();
         String source = toSource(spec);
         assertTrue(source.contains("@FunctionalInterface"),
-                "InvokeStageCaller must carry @FunctionalInterface");
+                "InvokeStageInvoker must carry @FunctionalInterface");
     }
 
     @Property(tries = 100)
@@ -112,16 +112,16 @@ class TerminalInterfaceSpecPropertyTest {
         TypeSpec spec = new TerminalInterfaceSpec(method).build();
         String source = toSource(spec);
         assertTrue(source.contains("@FunctionalInterface"),
-                "ConstructStageCaller must carry @FunctionalInterface");
+                "ConstructStageInvoker must carry @FunctionalInterface");
     }
 
     // -------------------------------------------------------------------------
     // Property 14: Checked exceptions are propagated through the chain
-    // Feature: project-rawit-curry, Property 14: Checked exceptions are propagated through the chain
+    // Feature: curry-to-invoker-rename, Property 14: Checked exceptions are propagated through the chain
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
-    void property14_checkedExceptionsPropagatedInInvoke(@ForAll("anyCurryMethod") AnnotatedMethod method) {
+    void property14_checkedExceptionsPropagatedInInvoke(@ForAll("anyInvokerMethod") AnnotatedMethod method) {
         TypeSpec spec = new TerminalInterfaceSpec(method).build();
         String source = toSource(spec);
 
@@ -153,7 +153,7 @@ class TerminalInterfaceSpecPropertyTest {
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
-    void invokeReturnTypeMatchesDescriptor(@ForAll("anyCurryMethod") AnnotatedMethod method) {
+    void invokeReturnTypeMatchesDescriptor(@ForAll("anyInvokerMethod") AnnotatedMethod method) {
         TypeSpec spec = new TerminalInterfaceSpec(method).build();
         String source = toSource(spec);
 
@@ -180,5 +180,33 @@ class TerminalInterfaceSpecPropertyTest {
         assertTrue(source.contains(expectedType + " invoke()"),
                 "invoke() return type must match descriptor " + method.returnTypeDescriptor()
                         + ", expected: " + expectedType);
+    }
+
+    // -------------------------------------------------------------------------
+    // Property 4: Terminal interface is InvokeStageInvoker for @Invoker chains
+    // Feature: curry-to-invoker-rename, Property 4: Terminal interface is InvokeStageInvoker for @Invoker chains
+    // Validates: Requirements 10.2, 10.6, 10.9
+    // -------------------------------------------------------------------------
+
+    @Property(tries = 100)
+    @Label("Property 4: Terminal interface is InvokeStageInvoker for @Invoker chains")
+    void property4_invokerTerminalInterfaceIsInvokeStageInvoker(@ForAll("anyInvokerMethod") AnnotatedMethod method) {
+        TypeSpec spec = new TerminalInterfaceSpec(method).build();
+        assertEquals("InvokeStageInvoker", spec.name,
+                "terminal interface for @Invoker must be named InvokeStageInvoker");
+    }
+
+    // -------------------------------------------------------------------------
+    // Property 5: Terminal interface is ConstructStageInvoker for @Constructor chains
+    // Feature: curry-to-invoker-rename, Property 5: Terminal interface is ConstructStageInvoker for @Constructor chains
+    // Validates: Requirements 10.3, 10.7, 10.10
+    // -------------------------------------------------------------------------
+
+    @Property(tries = 100)
+    @Label("Property 5: Terminal interface is ConstructStageInvoker for @Constructor chains")
+    void property5_constructorTerminalInterfaceIsConstructStageInvoker(@ForAll("anyConstructorMethod") AnnotatedMethod method) {
+        TypeSpec spec = new TerminalInterfaceSpec(method).build();
+        assertEquals("ConstructStageInvoker", spec.name,
+                "terminal interface for @Constructor must be named ConstructStageInvoker");
     }
 }

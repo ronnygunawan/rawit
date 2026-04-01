@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Builds the {@code TypeSpec} for the Caller_Class (e.g. {@code Bar} for {@code @Curry} on
+ * Builds the {@code TypeSpec} for the Invoker_Class (e.g. {@code Bar} for {@code @Invoker} on
  * method {@code bar}, or {@code Constructor} for {@code @Constructor}).
  *
  * <p>The generated class:
@@ -29,7 +29,7 @@ import java.util.List;
  *       arguments so far.</li>
  * </ul>
  */
-public class CallerClassSpec {
+public class InvokerClassSpec {
 
     private static final AnnotationSpec GENERATED_ANNOTATION = AnnotationSpec
             .builder(Generated.class)
@@ -37,19 +37,19 @@ public class CallerClassSpec {
             .build();
 
     private final MergeTree tree;
-    private final boolean isCurry;
+    private final boolean isInvoker;
     private final String callerClassName;
 
-    public CallerClassSpec(final MergeTree tree) {
+    public InvokerClassSpec(final MergeTree tree) {
         this.tree = tree;
-        // isCurry is true for @Curry annotations (including @Curry on constructors)
-        // isCurry is false only for @Constructor annotations
-        this.isCurry = tree.group().members().stream().anyMatch(m -> !m.isConstructorAnnotation());
+        // isInvoker is true for @Invoker annotations (including @Invoker on constructors)
+        // isInvoker is false only for @Constructor annotations
+        this.isInvoker = tree.group().members().stream().anyMatch(m -> !m.isConstructorAnnotation());
         this.callerClassName = resolveCallerClassName();
     }
 
     /**
-     * Builds and returns the Caller_Class {@link TypeSpec}.
+     * Builds and returns the Invoker_Class {@link TypeSpec}.
      */
     public TypeSpec build() {
         final TypeSpec.Builder classBuilder = TypeSpec.classBuilder(callerClassName)
@@ -98,7 +98,7 @@ public class CallerClassSpec {
      * Recursively generates stage method implementations on the current class builder and
      * accumulator inner classes for each stage transition.
      *
-     * @param classBuilder  the class being built (starts as the Caller_Class, then accumulators)
+     * @param classBuilder  the class being built (starts as the Invoker_Class, then accumulators)
      * @param accumulators  collector for generated accumulator inner classes
      * @param node          current merge tree node
      * @param accumulated   parameters accumulated so far (for accumulator class fields)
@@ -130,7 +130,7 @@ public class CallerClassSpec {
                         .addStatement("return new $L($L)", accClassName, buildAccumulatorArgs(accumulated, shared.paramName(), representative));
 
                 // Add @Override only when the current class implements the stage interface
-                // (i.e., when we're inside an accumulator class, not the top-level Caller_Class)
+                // (i.e., when we're inside an accumulator class, not the top-level Invoker_Class)
                 if (!accumulated.isEmpty()) {
                     stageMethod.addAnnotation(Override.class);
                 }
@@ -190,7 +190,7 @@ public class CallerClassSpec {
         // Determine the superinterface(s) for this accumulator class
         if (next instanceof TerminalNode terminal && terminal.continuation() != null) {
             // Prefix overload: this accumulator implements the combined interface
-            // (which extends InvokeStageCaller and adds the continuation's stage methods)
+            // (which extends InvokeStageInvoker and adds the continuation's stage methods)
             final TypeName combinedType = nextStageTypeName(next,
                     accumulated.isEmpty() ? "" : accumulated.get(accumulated.size() - 1).name(),
                     accumulated.size());
@@ -245,13 +245,13 @@ public class CallerClassSpec {
             final List<Parameter> accumulated,
             final AnnotatedMethod overload
     ) {
-        final String terminalMethodName = isCurry ? "invoke" : "construct";
+        final String terminalMethodName = isInvoker ? "invoke" : "construct";
         final TypeName returnType;
-        if (!isCurry) {
+        if (!isInvoker) {
             // @Constructor: construct() returns the enclosing class instance
             returnType = enclosingTypeName();
         } else if (overload.isConstructor()) {
-            // @Curry on a constructor: invoke() returns the enclosing class instance
+            // @Invoker on a constructor: invoke() returns the enclosing class instance
             returnType = enclosingTypeName();
         } else {
             returnType = TerminalInterfaceSpec.descriptorToTypeName(overload.returnTypeDescriptor());
@@ -296,14 +296,14 @@ public class CallerClassSpec {
     // -------------------------------------------------------------------------
 
     private String resolveCallerClassName() {
-        if (!isCurry) return "Constructor";
+        if (!isInvoker) return "Constructor";
         final String groupName = tree.group().groupName();
         if ("<init>".equals(groupName)) {
-            // @Curry on a constructor: use the class name + "Curry" as the caller class name
+            // @Invoker on a constructor: use the class name + "Invoker" as the caller class name
             final String enclosing = tree.group().enclosingClassName();
             final int lastSlash = enclosing.lastIndexOf('/');
             final String simpleName = lastSlash < 0 ? enclosing : enclosing.substring(lastSlash + 1);
-            return simpleName + "Curry";
+            return simpleName + "Invoker";
         }
         return StageInterfaceSpec.toPascalCase(groupName);
     }
@@ -318,7 +318,7 @@ public class CallerClassSpec {
 
     private TypeName terminalTypeName() {
         return com.squareup.javapoet.ClassName.bestGuess(
-                isCurry ? "InvokeStageCaller" : "ConstructStageCaller");
+                isInvoker ? "InvokeStageInvoker" : "ConstructStageInvoker");
     }
 
     private TypeName enclosingTypeName() {

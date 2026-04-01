@@ -74,7 +74,7 @@ class StageInterfaceSpecPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 9: One Stage_Interface per parameter
-    // Feature: project-rawit-curry, Property 9: One Stage_Interface per parameter
+    // Feature: curry-to-invoker-rename, Property 9: One Stage_Interface per parameter
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
@@ -91,7 +91,7 @@ class StageInterfaceSpecPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 10: Each Stage_Interface declares exactly one method named after its parameter
-    // Feature: project-rawit-curry, Property 10: Each Stage_Interface declares exactly one method named after its parameter
+    // Feature: curry-to-invoker-rename, Property 10: Each Stage_Interface declares exactly one method named after its parameter
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
@@ -115,7 +115,7 @@ class StageInterfaceSpecPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 11: Chain structure — each stage method returns the correct next type
-    // Feature: project-rawit-curry, Property 11: Chain structure — each stage method returns the correct next type
+    // Feature: curry-to-invoker-rename, Property 11: Chain structure — each stage method returns the correct next type
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
@@ -132,20 +132,20 @@ class StageInterfaceSpecPropertyTest {
 
             if (i < params.size() - 1) {
                 // Non-last stage: must return the next stage interface
-                String nextIfaceName = toPascalCase(params.get(i + 1).name()) + "StageCaller";
+                String nextIfaceName = toPascalCase(params.get(i + 1).name()) + "StageInvoker";
                 assertTrue(source.contains(nextIfaceName + " " + paramName + "("),
                         "stage " + i + " method must return " + nextIfaceName);
             } else {
-                // Last stage: must return InvokeStageCaller
-                assertTrue(source.contains("InvokeStageCaller " + paramName + "("),
-                        "last stage method must return InvokeStageCaller");
+                // Last stage: must return InvokeStageInvoker
+                assertTrue(source.contains("InvokeStageInvoker " + paramName + "("),
+                        "last stage method must return InvokeStageInvoker");
             }
         }
     }
 
     // -------------------------------------------------------------------------
     // Property 13: Stage interfaces carry @FunctionalInterface
-    // Feature: project-rawit-curry, Property 13: Stage interfaces carry @FunctionalInterface
+    // Feature: curry-to-invoker-rename, Property 13: Stage interfaces carry @FunctionalInterface
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
@@ -165,7 +165,7 @@ class StageInterfaceSpecPropertyTest {
     }
 
     // -------------------------------------------------------------------------
-    // Additional: interface names follow PascalCase + StageCaller convention
+    // Additional: interface names follow PascalCase + StageInvoker convention
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
@@ -177,9 +177,31 @@ class StageInterfaceSpecPropertyTest {
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 
         for (int i = 0; i < params.size(); i++) {
-            String expectedName = toPascalCase(params.get(i).name()) + "StageCaller";
+            String expectedName = toPascalCase(params.get(i).name()) + "StageInvoker";
             assertEquals(expectedName, specs.get(i).name,
                     "interface for param '" + params.get(i).name() + "' must be named " + expectedName);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Property 3: Stage interfaces use StageInvoker suffix
+    // Feature: curry-to-invoker-rename, Property 3: Stage interfaces use StageInvoker suffix
+    // Validates: Requirements 10.1, 10.8
+    // -------------------------------------------------------------------------
+
+    @Property(tries = 100)
+    void property3_stageInterfacesUseStageInvokerSuffix(
+            @ForAll("methodName") String name,
+            @ForAll("paramList") List<Parameter> params
+    ) {
+        MergeTree tree = linearTree(name, params);
+        List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
+
+        for (TypeSpec iface : specs) {
+            assertTrue(iface.name.endsWith("StageInvoker"),
+                    "stage interface '" + iface.name + "' must end with 'StageInvoker', not 'StageCaller'");
+            assertFalse(iface.name.endsWith("StageCaller"),
+                    "stage interface '" + iface.name + "' must not end with 'StageCaller'");
         }
     }
 
