@@ -142,13 +142,13 @@ together.
 - [x] 7. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 8. Implement bytecode injection (`inject` package)
-  - [ ] 8.1 Create `processors/inject/OverloadResolver.java`
+- [x] 8. Implement bytecode injection (`inject` package)
+  - [x] 8.1 Create `processors/inject/OverloadResolver.java`
     - Resolve the `.class` file path from the build output directory using `ProcessingEnvironment`
     - Convert binary class name (e.g. `com/example/Foo`) to file path
     - Return `Optional<Path>` — empty if file not found (emit `ERROR` at call site)
     - _Requirements: 3.1, 9.1_
-  - [ ] 8.2 Create `processors/inject/BytecodeInjector.java`
+  - [x] 8.2 Create `processors/inject/BytecodeInjector.java`
     - Use ASM `ClassReader` + `ClassWriter(COMPUTE_FRAMES | COMPUTE_MAXS)`
     - `InjectionClassVisitor` passes through all existing members
     - In `visitEnd()`, for each `MergeTree` in the group: check idempotency (method with overload
@@ -159,12 +159,12 @@ together.
     - Write `ClassWriter.toByteArray()` back to the `.class` file path
     - Preserve original `.class` on `VerifyError` (emit `ERROR`)
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 9.2, 16.1, 16.2, 16.3, 16.4_
-  - [ ]* 8.3 Write unit tests for `BytecodeInjector`
+  - [x] 8.3 Write unit tests for `BytecodeInjector`
     - Compile a minimal class to a temp dir, run injector, load via `URLClassLoader`, reflectively
       verify the parameterless overload is present and returns the correct type
     - Test idempotency: run injector twice, assert no duplicate method
     - _Requirements: 3.1, 3.3, 9.2_
-  - [ ]* 8.4 Write property test for `BytecodeInjector` — Properties 2, 3, 4, 17, 19
+  - [x] 8.4 Write property test for `BytecodeInjector` — Properties 2, 3, 4, 17, 19
     - **Property 2: Parameterless overload is injected**
     - **Property 3: Parameterless overload preserves access modifier**
     - **Property 4: Parameterless overload returns the Entry_Stage type**

@@ -15,6 +15,8 @@ import java.util.List;
  * @param parameters           ordered list of parameters
  * @param returnTypeDescriptor JVM return type descriptor, e.g. {@code "I"} or {@code "V"}
  * @param checkedExceptions    binary names of declared checked exception types
+ * @param accessFlags          ASM access flags (e.g. {@code Opcodes.ACC_PUBLIC}); defaults to
+ *                             {@code 0x0001} (public) when using the 7-arg constructor
  */
 public record AnnotatedMethod(
         String enclosingClassName,
@@ -23,8 +25,23 @@ public record AnnotatedMethod(
         boolean isConstructor,
         List<Parameter> parameters,
         String returnTypeDescriptor,
-        List<String> checkedExceptions
+        List<String> checkedExceptions,
+        int accessFlags
 ) {
+    /** Convenience constructor that defaults {@code accessFlags} to {@code ACC_PUBLIC} (0x0001). */
+    public AnnotatedMethod(
+            String enclosingClassName,
+            String methodName,
+            boolean isStatic,
+            boolean isConstructor,
+            List<Parameter> parameters,
+            String returnTypeDescriptor,
+            List<String> checkedExceptions
+    ) {
+        this(enclosingClassName, methodName, isStatic, isConstructor,
+                parameters, returnTypeDescriptor, checkedExceptions, 0x0001 /* ACC_PUBLIC */);
+    }
+
     public AnnotatedMethod {
         parameters = List.copyOf(parameters);
         checkedExceptions = List.copyOf(checkedExceptions);
