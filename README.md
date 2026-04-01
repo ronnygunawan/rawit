@@ -34,8 +34,8 @@ foo.bar().x(10).y(20).invoke();
 
 ```xml
 <dependency>
-    <groupId>rg.projectrawit</groupId>
-    <artifactId>rg-projectrawit</artifactId>
+    <groupId>rg.rawit</groupId>
+    <artifactId>rg-rawit</artifactId>
     <version>1.0-SNAPSHOT</version>
 </dependency>
 ```
@@ -70,8 +70,8 @@ foo.bar().x(10).y(20).invoke();
 > ```
 
 ```java
-import rawit.Curry;
-import rawit.Constructor;
+import rg.rawit.Curry;
+import rg.rawit.Constructor;
 
 public class Foo {
 
