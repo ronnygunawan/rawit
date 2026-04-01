@@ -1,7 +1,5 @@
 package rg.rawit.processors;
 
-import rg.rawit.Invoker;
-import rg.rawit.Constructor;
 import rg.rawit.processors.codegen.JavaPoetGenerator;
 import rg.rawit.processors.inject.BytecodeInjector;
 import rg.rawit.processors.inject.OverloadResolver;

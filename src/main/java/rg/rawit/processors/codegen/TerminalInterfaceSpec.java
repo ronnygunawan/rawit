@@ -11,7 +11,7 @@ import javax.lang.model.element.Modifier;
 import java.util.List;
 
 /**
- * Builds the terminal interface {@code TypeSpec} for a curried chain.
+ * Builds the terminal interface {@code TypeSpec} for a staged invocation chain.
  *
  * <ul>
  *   <li>For {@code @Invoker}: generates {@code InvokeStageInvoker} with a zero-arg {@code invoke()}

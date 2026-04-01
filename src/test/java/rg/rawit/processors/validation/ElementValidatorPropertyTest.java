@@ -141,7 +141,7 @@ class ElementValidatorPropertyTest {
             @ForAll("validMethodNames") String methodName,
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
-        // Feature: curry-to-invoker-rename, Property 1: Round-trip equivalence is preserved
+        // Feature: curry-to-invoker-rename, Property 1: Valid @Invoker element produces no errors
         // Validates: Requirements 5.1, 5.2, 5.4, 5.5, 8.1
 
         String className = uniqueClassName("ValidInvokerMethod");
@@ -168,7 +168,7 @@ class ElementValidatorPropertyTest {
     void property1_validInvokerConstructor_producesNoErrors(
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
-        // Feature: curry-to-invoker-rename, Property 1: Round-trip equivalence is preserved
+        // Feature: curry-to-invoker-rename, Property 1: Valid @Invoker element produces no errors
         // Validates: Requirements 5.1, 5.2, 5.4, 5.5, 8.1
 
         String className = uniqueClassName("ValidInvokerCtor");
@@ -195,7 +195,7 @@ class ElementValidatorPropertyTest {
     void property1_validConstructorAnnotation_producesNoErrors(
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
-        // Feature: curry-to-invoker-rename, Property 1: Round-trip equivalence is preserved
+        // Feature: curry-to-invoker-rename, Property 1: Valid @Invoker element produces no errors
         // Validates: Requirements 5.1, 5.2, 5.4, 5.5, 8.1
 
         String className = uniqueClassName("ValidConstructorAnnotation");
