@@ -22,7 +22,7 @@ together.
     - Add `@SupportedOptions("curry.debug")` to the class
     - _Requirements: 15, 16_
 
-- [ ] 2. Implement `ElementValidator`
+- [x] 2. Implement `ElementValidator`
   - [x] 2.1 Create `processors/validation/ElementValidator.java`
     - Validate `@Curry`: element kind is METHOD or CONSTRUCTOR, param count ≥ 1, not private
     - Validate `@Constructor`: element kind is CONSTRUCTOR only, param count ≥ 1, not private
@@ -39,16 +39,16 @@ together.
     - **Property 20: Exactly one error per violated validation rule**
     - **Validates: Requirements 1.3, 2.3, 10.2, 15.4**
 
-- [ ] 3. Implement data model (`model` package)
-  - [ ] 3.1 Create `processors/model/AnnotatedMethod.java` and `Parameter.java`
+- [x] 3. Implement data model (`model` package)
+  - [x] 3.1 Create `processors/model/AnnotatedMethod.java` and `Parameter.java`
     - `AnnotatedMethod`: record with `enclosingClassName`, `methodName`, `isStatic`, `isConstructor`,
       `List<Parameter> parameters`, `returnTypeDescriptor`, `List<String> checkedExceptions`
     - `Parameter`: record with `name` and `typeDescriptor`
     - _Requirements: 4, 5, 6_
-  - [ ] 3.2 Create `processors/model/OverloadGroup.java`
+  - [x] 3.2 Create `processors/model/OverloadGroup.java`
     - Record with `enclosingClassName`, `groupName`, `List<AnnotatedMethod> members`
     - _Requirements: 7.4, 11.1_
-  - [ ] 3.3 Create `processors/model/MergeNode.java` and `MergeTree.java`
+  - [x] 3.3 Create `processors/model/MergeNode.java` and `MergeTree.java`
     - `MergeNode`: sealed interface permitting `SharedNode`, `BranchingNode`, `TerminalNode`
     - `SharedNode`: record with `paramName`, `typeDescriptor`, `MergeNode next`
     - `BranchingNode`: record with `List<Branch> branches`
