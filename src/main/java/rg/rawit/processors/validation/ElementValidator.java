@@ -67,7 +67,7 @@ public class ElementValidator {
         if (exec.getParameters().isEmpty()) {
             messager.printMessage(
                     Diagnostic.Kind.ERROR,
-                    "invoker requires at least one parameter",
+                    "@Invoker requires at least one parameter",
                     element);
             hasError = true;
         }
