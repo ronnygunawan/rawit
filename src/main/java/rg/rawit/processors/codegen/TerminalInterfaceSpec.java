@@ -39,17 +39,17 @@ public class TerminalInterfaceSpec {
     public TypeSpec build() {
         if (method.isConstructorAnnotation()) {
             // @Constructor: use ConstructStageInvoker with construct() method
-            return buildConstructStageCaller();
+            return buildConstructStageInvoker();
         }
         // @Invoker (including @Invoker on constructors): use InvokeStageInvoker with invoke() method
-        return buildInvokeStageCaller();
+        return buildInvokeStageInvoker();
     }
 
     // -------------------------------------------------------------------------
     // InvokeStageInvoker — for @Invoker
     // -------------------------------------------------------------------------
 
-    private TypeSpec buildInvokeStageCaller() {
+    private TypeSpec buildInvokeStageInvoker() {
         final TypeName returnType;
         if (method.isConstructor()) {
             // @Invoker on a constructor: invoke() returns the enclosing class instance
@@ -70,7 +70,7 @@ public class TerminalInterfaceSpec {
     // ConstructStageInvoker — for @Constructor
     // -------------------------------------------------------------------------
 
-    private TypeSpec buildConstructStageCaller() {
+    private TypeSpec buildConstructStageInvoker() {
         // Return type is the enclosing class itself
         final TypeName returnType = binaryNameToClassName(method.enclosingClassName());
         final MethodSpec constructMethod = buildTerminalMethod("construct", returnType);

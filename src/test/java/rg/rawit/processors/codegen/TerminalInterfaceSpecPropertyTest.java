@@ -73,7 +73,7 @@ class TerminalInterfaceSpecPropertyTest {
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
-    void property12_curryTerminalInterfaceIsGenerated(@ForAll("anyInvokerMethod") AnnotatedMethod method) {
+    void property12_invokerTerminalInterfaceIsGenerated(@ForAll("anyInvokerMethod") AnnotatedMethod method) {
         TypeSpec spec = new TerminalInterfaceSpec(method).build();
 
         assertNotNull(spec, "terminal interface must be generated");
@@ -100,7 +100,7 @@ class TerminalInterfaceSpecPropertyTest {
     // -------------------------------------------------------------------------
 
     @Property(tries = 100)
-    void property13_curryTerminalCarriesFunctionalInterface(@ForAll("anyInvokerMethod") AnnotatedMethod method) {
+    void property13_invokerTerminalCarriesFunctionalInterface(@ForAll("anyInvokerMethod") AnnotatedMethod method) {
         TypeSpec spec = new TerminalInterfaceSpec(method).build();
         String source = toSource(spec);
         assertTrue(source.contains("@FunctionalInterface"),

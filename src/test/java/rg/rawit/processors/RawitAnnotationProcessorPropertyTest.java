@@ -215,7 +215,7 @@ class RawitAnnotationProcessorPropertyTest {
      * For any int values x and y, calling the invoker chain add().x(x).y(y).invoke()
      * must equal the direct call add(x, y).
      *
-     * Validates: Requirements 8.2
+     * Validates: Requirements 6.6, 8.1, 8.2, 12.4, 19.3, 19.4
      */
     @Property(tries = 10)
     void property1_roundTripEquivalenceWithInvoker(

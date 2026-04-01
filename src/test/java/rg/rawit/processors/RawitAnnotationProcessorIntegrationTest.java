@@ -214,7 +214,7 @@ class RawitAnnotationProcessorIntegrationTest {
     // =========================================================================
 
     @Test
-    void instanceMethod_curryChain_equalsDirectInvocation(@TempDir final Path outputDir)
+    void instanceMethod_invokerChain_equalsDirectInvocation(@TempDir final Path outputDir)
             throws Exception {
         final String source =
                 "import rg.rawit.Invoker;\n" +
@@ -248,7 +248,7 @@ class RawitAnnotationProcessorIntegrationTest {
     // =========================================================================
 
     @Test
-    void staticMethod_curryChain_equalsDirectInvocation(@TempDir final Path outputDir)
+    void staticMethod_invokerChain_equalsDirectInvocation(@TempDir final Path outputDir)
             throws Exception {
         final String source =
                 "import rg.rawit.Invoker;\n" +
@@ -280,7 +280,7 @@ class RawitAnnotationProcessorIntegrationTest {
     // =========================================================================
 
     @Test
-    void constructorWithCurry_curryChain_equalsDirectInvocation(@TempDir final Path outputDir)
+    void constructorWithInvoker_invokerChain_equalsDirectInvocation(@TempDir final Path outputDir)
             throws Exception {
         final String source =
                 "import rg.rawit.Invoker;\n" +

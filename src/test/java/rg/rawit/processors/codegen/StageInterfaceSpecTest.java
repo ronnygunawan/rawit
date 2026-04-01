@@ -169,7 +169,7 @@ class StageInterfaceSpecTest {
     }
 
     @Test
-    void lastStageReturnsInvokeStageCaller() {
+    void lastStageReturnsInvokeStageInvoker() {
         MergeTree tree = singleOverloadTree("bar", p("x", "I"), p("y", "I"));
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 
@@ -178,7 +178,7 @@ class StageInterfaceSpecTest {
     }
 
     @Test
-    void singleParamStageReturnsInvokeStageCaller() {
+    void singleParamStageReturnsInvokeStageInvoker() {
         MergeTree tree = singleOverloadTree("bar", p("x", "I"));
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 

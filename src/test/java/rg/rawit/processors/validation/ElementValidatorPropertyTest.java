@@ -142,9 +142,7 @@ class ElementValidatorPropertyTest {
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
         // Feature: curry-to-invoker-rename, Property 1: Valid @Invoker element produces no errors
-        // Validates: Requirements 5.1, 5.2, 5.4, 5.5, 8.1
-
-        String className = uniqueClassName("ValidInvokerMethod");
+        // Validates: Requirements 1.3, 2.3
         String visibilityPrefix = visibility.isEmpty() ? "" : visibility + " ";
         String params = buildParams(paramTypes);
 
@@ -169,9 +167,7 @@ class ElementValidatorPropertyTest {
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
         // Feature: curry-to-invoker-rename, Property 1: Valid @Invoker element produces no errors
-        // Validates: Requirements 5.1, 5.2, 5.4, 5.5, 8.1
-
-        String className = uniqueClassName("ValidInvokerCtor");
+        // Validates: Requirements 2.3
         String visibilityPrefix = visibility.isEmpty() ? "" : visibility + " ";
         String params = buildParams(paramTypes);
 
@@ -196,9 +192,7 @@ class ElementValidatorPropertyTest {
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
         // Feature: curry-to-invoker-rename, Property 1: Valid @Invoker element produces no errors
-        // Validates: Requirements 5.1, 5.2, 5.4, 5.5, 8.1
-
-        String className = uniqueClassName("ValidConstructorAnnotation");
+        // Validates: Requirements 15.4
         String visibilityPrefix = visibility.isEmpty() ? "" : visibility + " ";
         String params = buildParams(paramTypes);
 
