@@ -114,11 +114,11 @@ class StageInterfaceSpecTest {
 
         List<TypeSpec> specs = new StageInterfaceSpec(tree).buildAll();
 
-        // XStageCaller for the shared x, then XStageCaller for the branching (prev param = x)
+        // XStageCaller for the shared x, then BarXStageCaller for the branching (prev param = x)
         assertTrue(specs.stream().anyMatch(s -> s.name.equals("XStageCaller")),
                 "shared x must produce XStageCaller");
-        assertTrue(specs.stream().anyMatch(s -> s.name.equals("XStageCaller")),
-                "branching after x must produce XStageCaller");
+        assertTrue(specs.stream().anyMatch(s -> s.name.equals("BarXStageCaller")),
+                "branching after x must produce BarXStageCaller");
     }
 
     // -------------------------------------------------------------------------

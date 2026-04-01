@@ -283,17 +283,62 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     }
 
     /**
-     * Converts a {@link TypeElement}'s qualified name to a binary name with slashes.
-     * e.g. {@code "com.example.Foo"} → {@code "com/example/Foo"}
+     * Converts a {@link TypeElement} to a JVM binary name with slashes.
+     *
+     * <p>Examples:
+     * <ul>
+     *   <li>{@code com.example.Foo} → {@code com/example/Foo}</li>
+     *   <li>{@code com.example.Outer.Inner} → {@code com/example/Outer$Inner}</li>
+     * </ul>
+     *
+     * <p>Uses the enclosing-element chain to correctly handle nested types (using {@code $}
+     * as the separator between outer and inner class names).
      */
     private static String toBinaryName(final TypeElement typeElement) {
-        return typeElement.getQualifiedName().toString().replace('.', '/');
+        final List<String> typeNames = new ArrayList<>();
+        Element current = typeElement;
+        PackageElement pkg = null;
+
+        // Walk up the enclosing element chain, collecting type simple names (innermost first)
+        while (current != null && current.getKind() != ElementKind.PACKAGE) {
+            if (current instanceof TypeElement te) {
+                typeNames.add(te.getSimpleName().toString());
+            }
+            current = current.getEnclosingElement();
+        }
+        if (current instanceof PackageElement pe) {
+            pkg = pe;
+        }
+
+        // Reverse so we have outermost type first
+        Collections.reverse(typeNames);
+
+        final StringBuilder binaryName = new StringBuilder();
+        if (pkg != null && !pkg.isUnnamed()) {
+            binaryName.append(pkg.getQualifiedName().toString());
+            if (!typeNames.isEmpty()) {
+                binaryName.append('.');
+            }
+        }
+        if (!typeNames.isEmpty()) {
+            binaryName.append(typeNames.get(0));
+            for (int i = 1; i < typeNames.size(); i++) {
+                binaryName.append('$').append(typeNames.get(i));
+            }
+        }
+
+        // Convert package separators to JVM internal-name slashes
+        return binaryName.toString().replace('.', '/');
     }
 
     /**
      * Converts a {@link TypeMirror} to a JVM type descriptor string.
+     *
+     * <p>For declared (reference) types, uses {@link javax.lang.model.util.Elements#getBinaryName}
+     * on the underlying {@link TypeElement} so that nested types are rendered with {@code $}
+     * rather than {@code .} (e.g. {@code Lcom/example/Outer$Inner;}).
      */
-    private static String toTypeDescriptor(final TypeMirror type) {
+    private String toTypeDescriptor(final TypeMirror type) {
         return switch (type.getKind()) {
             case BOOLEAN -> "Z";
             case BYTE    -> "B";
@@ -308,10 +353,17 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                 final javax.lang.model.type.ArrayType arr = (javax.lang.model.type.ArrayType) type;
                 yield "[" + toTypeDescriptor(arr.getComponentType());
             }
+            case DECLARED -> {
+                final javax.lang.model.type.DeclaredType declared = (javax.lang.model.type.DeclaredType) type;
+                final TypeElement typeElement = (TypeElement) declared.asElement();
+                // getBinaryName uses '$' for nested types (e.g. "com.example.Outer$Inner")
+                final String binaryName = processingEnv.getElementUtils()
+                        .getBinaryName(typeElement).toString();
+                yield "L" + binaryName.replace('.', '/') + ";";
+            }
             default -> {
-                // Reference type — use L<binary-name>; form
+                // Fallback for other kinds (e.g. type variables, wildcards)
                 final String raw = type.toString();
-                // Strip generic type parameters if present
                 final int lt = raw.indexOf('<');
                 final String erased = lt >= 0 ? raw.substring(0, lt) : raw;
                 yield "L" + erased.replace('.', '/') + ";";
@@ -322,8 +374,17 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     /**
      * Converts a {@link TypeMirror} to an internal (slash-separated) class name.
      * Used for checked exception types.
+     *
+     * <p>For declared types, uses {@link javax.lang.model.util.Elements#getBinaryName} to
+     * correctly handle nested exception types (e.g. {@code com/example/Outer$MyException}).
      */
-    private static String toInternalName(final TypeMirror type) {
+    private String toInternalName(final TypeMirror type) {
+        if (type.getKind() == javax.lang.model.type.TypeKind.DECLARED) {
+            final javax.lang.model.type.DeclaredType declared = (javax.lang.model.type.DeclaredType) type;
+            final TypeElement typeElement = (TypeElement) declared.asElement();
+            return processingEnv.getElementUtils()
+                    .getBinaryName(typeElement).toString().replace('.', '/');
+        }
         final String raw = type.toString();
         final int lt = raw.indexOf('<');
         final String erased = lt >= 0 ? raw.substring(0, lt) : raw;

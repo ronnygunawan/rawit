@@ -358,7 +358,9 @@ public class CallerClassSpec {
     private static String binarySimpleName(final String binaryName) {
         final String dotName = binaryName.replace('/', '.');
         final int lastDot = dotName.lastIndexOf('.');
-        return lastDot < 0 ? dotName : dotName.substring(lastDot + 1);
+        final String simpleName = lastDot < 0 ? dotName : dotName.substring(lastDot + 1);
+        // Replace '$' with '.' so nested types render as valid Java source (e.g. Outer.Inner)
+        return simpleName.replace('$', '.');
     }
 
     private static <T> List<T> append(final List<T> list, final T item) {

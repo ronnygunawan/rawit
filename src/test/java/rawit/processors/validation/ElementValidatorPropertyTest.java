@@ -13,6 +13,8 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 /**
  * Property-based tests for {@link ElementValidator} validation rules.
  *
@@ -149,9 +151,9 @@ class ElementValidatorPropertyTest {
         List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
 
         long errorCount = countErrors(diags);
-        assert errorCount == 0
-                : "Expected 0 errors for valid @Curry method '%s' with visibility '%s' and %d params, got %d. Diagnostics: %s"
-                .formatted(methodName, visibility, paramTypes.size(), errorCount, diags);
+        assertEquals(0, errorCount,
+                "Expected 0 errors for valid @Curry method '%s' with visibility '%s' and %d params, got %d. Diagnostics: %s"
+                .formatted(methodName, visibility, paramTypes.size(), errorCount, diags));
     }
 
     @Property(tries = 100)
@@ -176,9 +178,9 @@ class ElementValidatorPropertyTest {
         List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
 
         long errorCount = countErrors(diags);
-        assert errorCount == 0
-                : "Expected 0 errors for valid @Curry constructor with visibility '%s' and %d params, got %d. Diagnostics: %s"
-                .formatted(visibility, paramTypes.size(), errorCount, diags);
+        assertEquals(0, errorCount,
+                "Expected 0 errors for valid @Curry constructor with visibility '%s' and %d params, got %d. Diagnostics: %s"
+                .formatted(visibility, paramTypes.size(), errorCount, diags));
     }
 
     @Property(tries = 100)
@@ -203,9 +205,9 @@ class ElementValidatorPropertyTest {
         List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
 
         long errorCount = countErrors(diags);
-        assert errorCount == 0
-                : "Expected 0 errors for valid @Constructor with visibility '%s' and %d params, got %d. Diagnostics: %s"
-                .formatted(visibility, paramTypes.size(), errorCount, diags);
+        assertEquals(0, errorCount,
+                "Expected 0 errors for valid @Constructor with visibility '%s' and %d params, got %d. Diagnostics: %s"
+                .formatted(visibility, paramTypes.size(), errorCount, diags));
     }
 
     // -------------------------------------------------------------------------
@@ -243,9 +245,9 @@ class ElementValidatorPropertyTest {
         // rule 1: zero params → 1 error
         // rule 2: conflict (method itself is a zero-param overload with same name) → 1 error
         // Total: exactly 2 errors for this specific combination
-        assert errorCount == 2
-                : "Expected exactly 2 errors for @Curry zero-param method (zero-params + self-conflict), got %d. Diagnostics: %s"
-                .formatted(errorCount, diags);
+        assertEquals(2, errorCount,
+                "Expected exactly 2 errors for @Curry zero-param method (zero-params + self-conflict), got %d. Diagnostics: %s"
+                .formatted(errorCount, diags));
     }
 
     @Property(tries = 100)
@@ -270,9 +272,9 @@ class ElementValidatorPropertyTest {
         List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
 
         long errorCount = countErrors(diags);
-        assert errorCount == 1
-                : "Expected exactly 1 error for private @Curry method with %d params, got %d. Diagnostics: %s"
-                .formatted(paramTypes.size(), errorCount, diags);
+        assertEquals(1, errorCount,
+                "Expected exactly 1 error for private @Curry method with %d params, got %d. Diagnostics: %s"
+                .formatted(paramTypes.size(), errorCount, diags));
     }
 
     @Property(tries = 100)
@@ -296,9 +298,9 @@ class ElementValidatorPropertyTest {
         List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
 
         long errorCount = countErrors(diags);
-        assert errorCount == 1
-                : "Expected exactly 1 error for @Curry constructor with zero params (visibility='%s'), got %d. Diagnostics: %s"
-                .formatted(visibility, errorCount, diags);
+        assertEquals(1, errorCount,
+                "Expected exactly 1 error for @Curry constructor with zero params (visibility='%s'), got %d. Diagnostics: %s"
+                .formatted(visibility, errorCount, diags));
     }
 
     @Property(tries = 100)
@@ -322,9 +324,9 @@ class ElementValidatorPropertyTest {
         List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
 
         long errorCount = countErrors(diags);
-        assert errorCount == 1
-                : "Expected exactly 1 error for private @Curry constructor with %d params, got %d. Diagnostics: %s"
-                .formatted(paramTypes.size(), errorCount, diags);
+        assertEquals(1, errorCount,
+                "Expected exactly 1 error for private @Curry constructor with %d params, got %d. Diagnostics: %s"
+                .formatted(paramTypes.size(), errorCount, diags));
     }
 
     @Property(tries = 100)
@@ -348,9 +350,9 @@ class ElementValidatorPropertyTest {
         List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
 
         long errorCount = countErrors(diags);
-        assert errorCount == 1
-                : "Expected exactly 1 error for @Constructor with zero params (visibility='%s'), got %d. Diagnostics: %s"
-                .formatted(visibility, errorCount, diags);
+        assertEquals(1, errorCount,
+                "Expected exactly 1 error for @Constructor with zero params (visibility='%s'), got %d. Diagnostics: %s"
+                .formatted(visibility, errorCount, diags));
     }
 
     @Property(tries = 100)
@@ -374,8 +376,8 @@ class ElementValidatorPropertyTest {
         List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
 
         long errorCount = countErrors(diags);
-        assert errorCount == 1
-                : "Expected exactly 1 error for private @Constructor with %d params, got %d. Diagnostics: %s"
-                .formatted(paramTypes.size(), errorCount, diags);
+        assertEquals(1, errorCount,
+                "Expected exactly 1 error for private @Constructor with %d params, got %d. Diagnostics: %s"
+                .formatted(paramTypes.size(), errorCount, diags));
     }
 }

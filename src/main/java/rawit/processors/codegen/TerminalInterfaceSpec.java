@@ -143,10 +143,18 @@ public class TerminalInterfaceSpec {
     static ClassName binaryNameToClassName(final String binaryName) {
         final String dotName = binaryName.replace('/', '.');
         final int lastDot = dotName.lastIndexOf('.');
-        if (lastDot < 0) {
-            return ClassName.get("", dotName);
+        final String packageName = lastDot < 0 ? "" : dotName.substring(0, lastDot);
+        final String simpleBinaryName = lastDot < 0 ? dotName : dotName.substring(lastDot + 1);
+
+        // Split on '$' to separate outer and nested class names for JavaPoet
+        final String[] simpleNames = simpleBinaryName.split("\\$");
+        if (simpleNames.length <= 1) {
+            return ClassName.get(packageName, simpleBinaryName);
         }
-        return ClassName.get(dotName.substring(0, lastDot), dotName.substring(lastDot + 1));
+        final String outer = simpleNames[0];
+        final String[] nested = new String[simpleNames.length - 1];
+        System.arraycopy(simpleNames, 1, nested, 0, nested.length);
+        return ClassName.get(packageName, outer, nested);
     }
 
     private static String binaryToPackage(final String binaryName) {
