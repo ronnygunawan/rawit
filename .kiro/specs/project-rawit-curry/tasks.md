@@ -75,43 +75,43 @@ together.
     - **Property 24: Prefix overload stage exposes both terminal and continuation**
     - **Validates: Requirements 11.1, 11.2, 11.3, 11.4, 12.1, 12.2, 12.3, 14.4, 20.2, 20.4, 20.5, 20.6**
 
-- [~] 5. Checkpoint — Ensure all tests pass
+- [x] 5. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Implement JavaPoet code generation (`codegen` package)
-  - [ ] 6.1 Create `processors/codegen/TerminalInterfaceSpec.java`
+- [x] 6. Implement JavaPoet code generation (`codegen` package)
+  - [x] 6.1 Create `processors/codegen/TerminalInterfaceSpec.java`
     - Build `TypeSpec` for `InvokeStageCaller` (`@Curry`) and `ConstructStageCaller` (`@Constructor`)
     - Single zero-arg `invoke()` / `construct()` method with correct return type
     - Propagate checked exceptions in `throws` clause
     - Annotate with `@FunctionalInterface`
     - _Requirements: 5.5, 6.5, 18.4, 19.1, 19.2, 19.5_
-  - [ ]* 6.2 Write unit tests for `TerminalInterfaceSpec`
+  - [x] 6.2 Write unit tests for `TerminalInterfaceSpec`
     - Assert on `JavaFile.toString()` / `TypeSpec.toString()` for `invoke()` return type, `@FunctionalInterface`,
       `void` return, checked exceptions
     - _Requirements: 5.5, 5.8, 6.5, 19.2_
-  - [ ]* 6.3 Write property test for `TerminalInterfaceSpec` — Properties 12, 13, 14
+  - [x] 6.3 Write property test for `TerminalInterfaceSpec` — Properties 12, 13, 14
     - **Property 12: Terminal interface is generated**
     - **Property 13: Stage interfaces carry @FunctionalInterface**
     - **Property 14: Checked exceptions are propagated through the chain**
     - **Validates: Requirements 5.5, 5.8, 6.5, 18.6, 19.1, 19.2, 19.5**
-  - [ ] 6.4 Create `processors/codegen/StageInterfaceSpec.java`
+  - [x] 6.4 Create `processors/codegen/StageInterfaceSpec.java`
     - Build `TypeSpec` for each `<PascalParam>StageCaller` / `<PascalParam>StageConstructor` interface
     - Single stage method named after the parameter, returning the next stage interface or terminal
     - Use primitive types directly (no boxing)
     - Annotate with `@FunctionalInterface`
     - Apply Algorithm 2 (stage interface name resolution) from the design
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.6, 5.8, 11.5, 18.1, 18.2, 18.3, 18.5, 18.6_
-  - [ ]* 6.5 Write unit tests for `StageInterfaceSpec`
+  - [x] 6.5 Write unit tests for `StageInterfaceSpec`
     - Assert on generated source: interface name, method name, parameter type (primitive), return type,
       `@FunctionalInterface`, branching stage name at position 0 vs position n
     - _Requirements: 5.1, 5.2, 5.3, 5.6, 5.8_
-  - [ ]* 6.6 Write property test for `StageInterfaceSpec` — Properties 9, 10, 11, 13
+  - [x] 6.6 Write property test for `StageInterfaceSpec` — Properties 9, 10, 11, 13
     - **Property 9: One Stage_Interface per parameter**
     - **Property 10: Each Stage_Interface declares exactly one method named after its parameter**
     - **Property 11: Chain structure — each stage method returns the correct next type**
     - **Property 13: Stage interfaces carry @FunctionalInterface**
     - **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.6, 5.8, 18.1, 18.2, 18.3, 18.5, 18.6**
-  - [ ] 6.7 Create `processors/codegen/CallerClassSpec.java`
+  - [x] 6.7 Create `processors/codegen/CallerClassSpec.java`
     - Build `TypeSpec` for the `Caller_Class` (`Bar` for `@Curry`, `Constructor` for `@Constructor`)
     - `public static` class implementing all stage interfaces
     - `private final` fields for enclosing instance (instance methods) and accumulated args
@@ -119,27 +119,27 @@ together.
     - Nested stage interface `TypeSpec`s built via `StageInterfaceSpec` and `TerminalInterfaceSpec`
     - Per-stage inner accumulator classes (e.g. `Bar$WithX`, `Bar$WithXY`) or flat approach
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 6.1, 6.2, 6.3, 6.4, 8.3, 17.1, 17.2, 17.3, 17.4_
-  - [ ]* 6.8 Write unit tests for `CallerClassSpec`
+  - [x] 6.8 Write unit tests for `CallerClassSpec`
     - Assert on generated source: class name, `public static`, `@Generated`, `private final` fields,
       implements clause, `invoke()` body delegates to captured instance / static call / `new`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 6.1, 6.2, 6.3, 6.4_
-  - [ ]* 6.9 Write property test for `CallerClassSpec` — Properties 5, 6, 7, 8
+  - [x] 6.9 Write property test for `CallerClassSpec` — Properties 5, 6, 7, 8
     - **Property 5: Caller_Class is injected as a public static inner class**
     - **Property 6: Caller_Class implements all Stage_Interfaces**
     - **Property 7: All Caller_Class fields are private and final**
     - **Property 8: Caller_Class carries the @Generated annotation**
     - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 8.3, 17.1, 17.2, 17.3, 17.4**
-  - [ ] 6.10 Create `processors/codegen/JavaPoetGenerator.java`
+  - [x] 6.10 Create `processors/codegen/JavaPoetGenerator.java`
     - Orchestrate `CallerClassSpec`, `StageInterfaceSpec`, `TerminalInterfaceSpec` per `MergeTree`
     - Write via `JavaFile.builder(...).build().writeTo(env.getFiler())`
     - Catch `FilerException` (already exists) and log as `NOTE` (idempotency guard)
     - _Requirements: 7.1, 7.2, 9.1, 9.2, 10.1_
-  - [ ]* 6.11 Write unit tests for `JavaPoetGenerator`
+  - [x] 6.11 Write unit tests for `JavaPoetGenerator`
     - Use a mock `Filer` to capture written `JavaFile` content; assert on source strings
     - Test idempotency: second call with same group does not throw, logs NOTE
     - _Requirements: 7.1, 7.2, 9.1, 9.2_
 
-- [ ] 7. Checkpoint — Ensure all tests pass
+- [x] 7. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 8. Implement bytecode injection (`inject` package)

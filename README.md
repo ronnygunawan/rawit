@@ -18,12 +18,12 @@ foo.bar().x(10).y(20).invoke();
 
 ## ✨ Features
 
-- **`@Curry`** — turns any method or constructor into a staged call chain ending with `.invoke()`
+- **`@Curry`** — turns any non-private method (instance or static) into a staged call chain ending with `.invoke()`
 - **`@Constructor`** — injects a `public static constructor()` entry point for staged object construction ending with `.construct()`
-- Works on **instance methods**, **static methods**, and **constructors**
+- Works on **instance methods** and **static methods** (`@Curry`), and **constructors** (`@Constructor`)
 - Supports **overload groups** — multiple overloads with the same name share a single entry point and branch only where their signatures diverge
 - **Zero runtime dependency** — the processor runs at compile time only
-- Operates like **Lombok** — injects directly into the original `.class` file, no separate companion class needed
+- Operates like **Lombok** — generates inner classes and interfaces via JavaPoet, and injects the parameterless entry-point overload directly into the original `.class` file using ASM
 - Full **compile-time error reporting** — invalid usages are caught at `javac` time with clear messages
 
 ---
@@ -93,7 +93,7 @@ Point p = Point.constructor().x(1).y(2).construct(); // == new Point(1, 2)
 
 ### `@Curry`
 
-Place on any **non-private** method or constructor with **at least one parameter**.
+Place on any **non-private** method (instance or static) with **at least one parameter**.
 
 ```java
 @Curry
@@ -188,8 +188,8 @@ mvn test
 
 Rawit uses a dual testing approach:
 
-- **Unit tests** (JUnit 5) — verify specific validation rules, code generation output, and bytecode injection
-- **Property-based tests** (jqwik) — verify universal correctness properties across many generated inputs, including round-trip equivalence and injection idempotency
+- **Unit tests** (JUnit 5) — verify specific validation rules, merge tree construction, and code generation output
+- **Property-based tests** (jqwik) — verify universal correctness properties across many generated inputs, including shared-prefix computation, branching, checked exception propagation, and `@FunctionalInterface` annotation
 
 ---
 
