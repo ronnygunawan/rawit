@@ -42,6 +42,33 @@ foo.bar().x(10).y(20).invoke();
 
 ### 2. Annotate your methods
 
+> **Build requirement:** Rawit injects generated entry points into existing `.class` files, which
+> means the declaring class must be compiled *before* annotation processing runs. In a standard
+> single-pass `javac`/Maven compile, annotation processing runs before `.class` files are written,
+> so injection is skipped silently on the first pass. To enable injection, configure a **two-pass
+> compile** in your `pom.xml`:
+>
+> ```xml
+> <!-- Pass 1: compile sources without annotation processing -->
+> <plugin>
+>   <groupId>org.apache.maven.plugins</groupId>
+>   <artifactId>maven-compiler-plugin</artifactId>
+>   <executions>
+>     <execution>
+>       <id>default-compile</id>
+>       <configuration><compilerArgument>-proc:none</compilerArgument></configuration>
+>     </execution>
+>     <!-- Pass 2: run annotation processing only (classes already exist) -->
+>     <execution>
+>       <id>process-annotations</id>
+>       <phase>process-classes</phase>
+>       <goals><goal>compile</goal></goals>
+>       <configuration><compilerArgument>-proc:only</compilerArgument></configuration>
+>     </execution>
+>   </executions>
+> </plugin>
+> ```
+
 ```java
 import rawit.Curry;
 import rawit.Constructor;

@@ -89,9 +89,6 @@ class ElementValidatorPropertyTest {
     private long countErrors(List<Diagnostic<? extends JavaFileObject>> diags) {
         return diags.stream()
                 .filter(d -> d.getKind() == Diagnostic.Kind.ERROR)
-                // Exclude the .class-not-found error — it fires in -proc:only mode (no .class produced)
-                // and is a pipeline concern, not a validation concern.
-                .filter(d -> !d.getMessage(Locale.ROOT).contains(".class file not found"))
                 .count();
     }
 

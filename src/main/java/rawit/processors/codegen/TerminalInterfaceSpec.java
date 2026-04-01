@@ -53,12 +53,7 @@ public class TerminalInterfaceSpec {
         final TypeName returnType;
         if (method.isConstructor()) {
             // @Curry on a constructor: invoke() returns the enclosing class instance
-            final String binaryName = method.enclosingClassName();
-            final String packageName = binaryToPackage(binaryName);
-            final String simpleName = binaryToSimpleName(binaryName);
-            returnType = packageName.isEmpty()
-                    ? ClassName.get("", simpleName)
-                    : ClassName.get(packageName, simpleName);
+            returnType = binaryNameToClassName(method.enclosingClassName());
         } else {
             returnType = descriptorToTypeName(method.returnTypeDescriptor());
         }
@@ -77,13 +72,7 @@ public class TerminalInterfaceSpec {
 
     private TypeSpec buildConstructStageCaller() {
         // Return type is the enclosing class itself
-        final String binaryName = method.enclosingClassName();
-        final String packageName = binaryToPackage(binaryName);
-        final String simpleName = binaryToSimpleName(binaryName);
-        final TypeName returnType = packageName.isEmpty()
-                ? ClassName.get("", simpleName)
-                : ClassName.get(packageName, simpleName);
-
+        final TypeName returnType = binaryNameToClassName(method.enclosingClassName());
         final MethodSpec constructMethod = buildTerminalMethod("construct", returnType);
 
         return TypeSpec.interfaceBuilder("ConstructStageCaller")
@@ -116,7 +105,8 @@ public class TerminalInterfaceSpec {
     /**
      * Converts a JVM type descriptor to a JavaPoet {@link TypeName}.
      *
-     * <p>Primitives use their one-character descriptors; object types use {@code L<binary>;} form.
+     * <p>Primitives use their one-character descriptors; object types use {@code L<binary>;} form;
+     * array types use {@code [} prefix and are handled recursively.
      */
     static TypeName descriptorToTypeName(final String descriptor) {
         return switch (descriptor) {
@@ -130,11 +120,16 @@ public class TerminalInterfaceSpec {
             case "C" -> TypeName.CHAR;
             case "S" -> TypeName.SHORT;
             default -> {
+                if (descriptor.startsWith("[")) {
+                    // Array type — recurse on the component descriptor
+                    final TypeName component = descriptorToTypeName(descriptor.substring(1));
+                    yield com.squareup.javapoet.ArrayTypeName.of(component);
+                }
                 if (descriptor.startsWith("L") && descriptor.endsWith(";")) {
                     final String binaryName = descriptor.substring(1, descriptor.length() - 1);
                     yield binaryNameToClassName(binaryName);
                 }
-                // Array or other — fall back to Object
+                // Unknown / type variable — erase to Object
                 yield ClassName.OBJECT;
             }
         };
@@ -157,15 +152,4 @@ public class TerminalInterfaceSpec {
         return ClassName.get(packageName, outer, nested);
     }
 
-    private static String binaryToPackage(final String binaryName) {
-        final String dotName = binaryName.replace('/', '.');
-        final int lastDot = dotName.lastIndexOf('.');
-        return lastDot < 0 ? "" : dotName.substring(0, lastDot);
-    }
-
-    private static String binaryToSimpleName(final String binaryName) {
-        final String dotName = binaryName.replace('/', '.');
-        final int lastDot = dotName.lastIndexOf('.');
-        return lastDot < 0 ? dotName : dotName.substring(lastDot + 1);
-    }
 }

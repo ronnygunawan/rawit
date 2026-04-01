@@ -34,12 +34,18 @@ public class OverloadResolver {
             final String simpleName = toSimpleName(binaryClassName) + ".class";
             final javax.tools.FileObject resource = env.getFiler().getResource(
                     StandardLocation.CLASS_OUTPUT, packageName, simpleName);
-            final Path classFile = Paths.get(resource.toUri());
+            final java.net.URI uri = resource.toUri();
+            // Only attempt Path conversion for file: URIs — other schemes (e.g. jar:, mem:)
+            // are not addressable as a default-filesystem Path.
+            if (!"file".equalsIgnoreCase(uri.getScheme())) {
+                return Optional.empty();
+            }
+            final Path classFile = Paths.get(uri);
             if (Files.exists(classFile)) {
                 return Optional.of(classFile);
             }
-        } catch (final IOException e) {
-            // Fall through — file not found or location not available
+        } catch (final IOException | IllegalArgumentException e) {
+            // Fall through — file not found or URI not convertible
         }
 
         return Optional.empty();

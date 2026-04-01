@@ -74,10 +74,7 @@ class ElementValidatorTest {
             List<Diagnostic<? extends JavaFileObject>> diags) {
         List<Diagnostic<? extends JavaFileObject>> result = new ArrayList<>();
         for (Diagnostic<? extends JavaFileObject> d : diags) {
-            if (d.getKind() == Diagnostic.Kind.ERROR
-                    // Exclude the .class-not-found pipeline error — tests use -proc:only
-                    // (no .class produced) so this fires on valid elements too.
-                    && !d.getMessage(Locale.ROOT).contains(".class file not found")) {
+            if (d.getKind() == Diagnostic.Kind.ERROR) {
                 result.add(d);
             }
         }

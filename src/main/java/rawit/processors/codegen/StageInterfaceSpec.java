@@ -12,7 +12,9 @@ import rawit.processors.model.MergeTree;
 
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Builds {@link TypeSpec} instances for each stage interface in a curried chain.
@@ -153,11 +155,13 @@ public class StageInterfaceSpec {
                 .returns(returnType)
                 .addParameter(paramType, paramName);
 
-        // Propagate checked exceptions from all members in the group
+        // Propagate checked exceptions from all members in the group — deduplicated
+        final Set<String> seen = new LinkedHashSet<>();
         for (final AnnotatedMethod member : tree.group().members()) {
-            for (final String ex : member.checkedExceptions()) {
-                mb.addException(TerminalInterfaceSpec.binaryNameToClassName(ex));
-            }
+            seen.addAll(member.checkedExceptions());
+        }
+        for (final String ex : seen) {
+            mb.addException(TerminalInterfaceSpec.binaryNameToClassName(ex));
         }
 
         return mb.build();

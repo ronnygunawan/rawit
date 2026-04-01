@@ -21,7 +21,7 @@ import java.util.List;
  * <p>The generated class:
  * <ul>
  *   <li>Is {@code public static} and annotated with {@code @Generated}.</li>
- *   <li>Implements the first stage interface.</li>
+ *   <li>Acts as the public entry point to the staged API, returning the first stage interface.</li>
  *   <li>Contains nested stage interface {@code TypeSpec}s (via {@link StageInterfaceSpec} and
  *       {@link TerminalInterfaceSpec}).</li>
  *   <li>Uses a flat accumulator approach: per-stage inner classes ({@code Bar$WithX},

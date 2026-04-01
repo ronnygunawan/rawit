@@ -173,18 +173,21 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
         }
 
         // Only generate source and inject bytecode for classes whose .class file exists.
-        // If the .class file is not found, emit an ERROR — the declaring class must be compiled
-        // before the annotation processor can inject the parameterless overload.
+        // In a standard single-pass javac/Maven compile, annotation processing runs before
+        // .class files are written, so the .class file may not exist yet. We skip injection
+        // silently in that case — users who need injection must run a two-pass compile
+        // (see README for details).
         final List<MergeTree> treesWithClassFile = new ArrayList<>();
         for (final Map.Entry<String, List<MergeTree>> entry : treesByClass.entrySet()) {
             final String enclosingClassName = entry.getKey();
             final Optional<Path> classFilePath = overloadResolver.resolve(enclosingClassName, processingEnv);
             if (classFilePath.isEmpty()) {
-                messager.printMessage(Diagnostic.Kind.ERROR,
-                        ".class file not found for " + enclosingClassName.replace('/', '.')
-                                + " — Rawit cannot inject generated overloads. "
-                                + "Ensure the declaring class is compiled and available on the "
-                                + "annotation processor classpath (avoid -proc:only without prior compilation).");
+                if (debug) {
+                    messager.printMessage(Diagnostic.Kind.NOTE,
+                            "[curry.debug] .class file not found for "
+                                    + enclosingClassName.replace('/', '.')
+                                    + " — skipping bytecode injection (run a two-pass compile for injection)");
+                }
                 continue;
             }
             treesWithClassFile.addAll(entry.getValue());
@@ -366,11 +369,9 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                 yield "L" + binaryName.replace('.', '/') + ";";
             }
             default -> {
-                // Fallback for other kinds (e.g. type variables, wildcards)
-                final String raw = type.toString();
-                final int lt = raw.indexOf('<');
-                final String erased = lt >= 0 ? raw.substring(0, lt) : raw;
-                yield "L" + erased.replace('.', '/') + ";";
+                // Type variables and wildcards are erased to Object at the JVM level.
+                // Other unknown kinds also fall back to Object to avoid invalid descriptors.
+                yield "Ljava/lang/Object;";
             }
         };
     }
