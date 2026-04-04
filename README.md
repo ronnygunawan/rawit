@@ -1,5 +1,7 @@
 # 🌶️ Rawit
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.ronnygunawan/rawit)](https://central.sonatype.com/artifact/io.github.ronnygunawan/rawit)
+
 > Compile-time staged invocation for Java — fluent, type-safe call chains at compile time.
 
 Rawit is a Java 21 annotation processor that transforms your methods and constructors into
