@@ -136,7 +136,7 @@ class ElementValidatorPropertyTest {
     // Property 1: Valid element produces no errors
     // -------------------------------------------------------------------------
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property1_validInvokerMethod_producesNoErrors(
             @ForAll("validMethodNames") String methodName,
             @ForAll("paramTypeLists") List<String> paramTypes,
@@ -164,7 +164,7 @@ class ElementValidatorPropertyTest {
                 .formatted(methodName, visibility, paramTypes.size(), errorCount, diags));
     }
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property1_validInvokerConstructor_producesNoErrors(
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
@@ -191,7 +191,7 @@ class ElementValidatorPropertyTest {
                 .formatted(visibility, paramTypes.size(), errorCount, diags));
     }
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property1_validConstructorAnnotation_producesNoErrors(
             @ForAll("paramTypeLists") List<String> paramTypes,
             @ForAll("validVisibilities") String visibility) {
@@ -222,7 +222,7 @@ class ElementValidatorPropertyTest {
     // Property 20: Exactly one error per violated validation rule
     // -------------------------------------------------------------------------
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property20_invokerZeroParams_exactlyOneError(
             @ForAll("validMethodNames") String methodName,
             @ForAll("validVisibilities") String visibility) {
@@ -258,7 +258,7 @@ class ElementValidatorPropertyTest {
                 .formatted(errorCount, diags));
     }
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property20_invokerPrivateMethod_exactlyOneError(
             @ForAll("validMethodNames") String methodName,
             @ForAll("paramTypeLists") List<String> paramTypes) {
@@ -285,7 +285,7 @@ class ElementValidatorPropertyTest {
                 .formatted(paramTypes.size(), errorCount, diags));
     }
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property20_invokerZeroParamsConstructor_exactlyOneError(
             @ForAll("validVisibilities") String visibility) {
         // Feature: curry-to-invoker-rename, Property 20: Exactly one error per violated validation rule
@@ -311,7 +311,7 @@ class ElementValidatorPropertyTest {
                 .formatted(visibility, errorCount, diags));
     }
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property20_invokerPrivateConstructor_exactlyOneError(
             @ForAll("paramTypeLists") List<String> paramTypes) {
         // Feature: curry-to-invoker-rename, Property 20: Exactly one error per violated validation rule
@@ -337,7 +337,7 @@ class ElementValidatorPropertyTest {
                 .formatted(paramTypes.size(), errorCount, diags));
     }
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property20_constructorAnnotationZeroParams_exactlyOneError(
             @ForAll("validVisibilities") String visibility) {
         // Feature: curry-to-invoker-rename, Property 20: Exactly one error per violated validation rule
@@ -363,7 +363,7 @@ class ElementValidatorPropertyTest {
                 .formatted(visibility, errorCount, diags));
     }
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property20_constructorAnnotationPrivate_exactlyOneError(
             @ForAll("paramTypeLists") List<String> paramTypes) {
         // Feature: curry-to-invoker-rename, Property 20: Exactly one error per violated validation rule

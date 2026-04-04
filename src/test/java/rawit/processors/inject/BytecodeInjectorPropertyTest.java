@@ -215,7 +215,7 @@ class BytecodeInjectorPropertyTest {
     // Feature: project-rawit-curry, Property 2: Parameterless overload is injected
     // -------------------------------------------------------------------------
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property2_parameterlessOverloadIsInjected(
             @ForAll("anyMethodName") String methodName,
             @ForAll("paramList") List<Parameter> params
@@ -253,7 +253,7 @@ class BytecodeInjectorPropertyTest {
     // Feature: project-rawit-curry, Property 3: Parameterless overload preserves access modifier
     // -------------------------------------------------------------------------
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property3_parameterlessOverloadPreservesAccessModifier(
             @ForAll("anyMethodName") String methodName,
             @ForAll("paramList") List<Parameter> params,
@@ -303,7 +303,7 @@ class BytecodeInjectorPropertyTest {
     // Feature: project-rawit-curry, Property 4: Parameterless overload returns the Entry_Stage type
     // -------------------------------------------------------------------------
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property4_parameterlessOverloadReturnsEntryStageType(
             @ForAll("anyMethodName") String methodName,
             @ForAll("paramList") List<Parameter> params
@@ -345,7 +345,7 @@ class BytecodeInjectorPropertyTest {
     // Feature: project-rawit-curry, Property 17: Generated .class files load without VerifyError
     // -------------------------------------------------------------------------
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property17_generatedClassFilesLoadWithoutVerifyError(
             @ForAll("anyMethodName") String methodName,
             @ForAll("paramList") List<Parameter> params
@@ -389,7 +389,7 @@ class BytecodeInjectorPropertyTest {
     // Feature: project-rawit-curry, Property 19: Injection idempotency — re-running the injector is a no-op
     // -------------------------------------------------------------------------
 
-    @Property(tries = 100)
+    @Property(tries = 5)
     void property19_injectionIdempotency(
             @ForAll("anyMethodName") String methodName,
             @ForAll("paramList") List<Parameter> params

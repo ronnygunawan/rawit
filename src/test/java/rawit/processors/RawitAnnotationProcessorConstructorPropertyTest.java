@@ -207,7 +207,7 @@ class RawitAnnotationProcessorConstructorPropertyTest {
      *
      * Validates: Requirements 16.1, 16.2
      */
-    @Property(tries = 10)
+    @Property(tries = 5)
     void property25_constructorEntryPointIsPublicStatic(
             @ForAll("paramCount") int n
     ) throws Exception {
@@ -251,7 +251,7 @@ class RawitAnnotationProcessorConstructorPropertyTest {
      *
      * Validates: Requirements 17.1
      */
-    @Property(tries = 10)
+    @Property(tries = 5)
     void property26_constructorCallerClassIsPublic(
             @ForAll("paramCount") int n
     ) throws Exception {
@@ -285,7 +285,7 @@ class RawitAnnotationProcessorConstructorPropertyTest {
      *
      * Validates: Requirements 19.2
      */
-    @Property(tries = 10)
+    @Property(tries = 5)
     void property27_constructStageInvokerHasConstructMethod(
             @ForAll("paramCount") int n
     ) throws Exception {

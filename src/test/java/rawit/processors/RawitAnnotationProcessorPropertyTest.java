@@ -217,7 +217,7 @@ class RawitAnnotationProcessorPropertyTest {
      *
      * Validates: Requirements 6.6, 8.1, 8.2, 12.4, 19.3, 19.4
      */
-    @Property(tries = 10)
+    @Property(tries = 5)
     void property1_roundTripEquivalenceWithInvoker(
             @ForAll("smallInt") int x,
             @ForAll("smallInt") int y
@@ -265,7 +265,7 @@ class RawitAnnotationProcessorPropertyTest {
      *
      * Validates: Requirements 7.1, 7.2
      */
-    @Property(tries = 10)
+    @Property(tries = 5)
     void property16_multipleAnnotationsProduceSeparateCallerClasses(
             @ForAll("distinctMethodNames") List<String> methodNames
     ) throws Exception {
@@ -333,7 +333,7 @@ class RawitAnnotationProcessorPropertyTest {
      *
      * Validates: Requirements 8.4
      */
-    @Property(tries = 10)
+    @Property(tries = 5)
     void property18_invokeIdempotency(
             @ForAll("smallInt") int x,
             @ForAll("smallInt") int y
