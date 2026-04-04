@@ -34,10 +34,30 @@ foo.bar().x(10).y(20).invoke();
 
 ```xml
 <dependency>
-    <groupId>rg.rawit</groupId>
-    <artifactId>rg-rawit</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <groupId>io.github.ronnygunawan</groupId>
+    <artifactId>rawit</artifactId>
+    <version>VERSION</version>
 </dependency>
+```
+
+#### Gradle Groovy DSL
+
+```groovy
+// Groovy DSL
+dependencies {
+    annotationProcessor 'io.github.ronnygunawan:rawit:VERSION'
+    compileOnly 'io.github.ronnygunawan:rawit:VERSION'
+}
+```
+
+#### Gradle Kotlin DSL
+
+```kotlin
+// Kotlin DSL
+dependencies {
+    annotationProcessor("io.github.ronnygunawan:rawit:VERSION")
+    compileOnly("io.github.ronnygunawan:rawit:VERSION")
+}
 ```
 
 ### 2. Annotate your methods
@@ -70,8 +90,8 @@ foo.bar().x(10).y(20).invoke();
 > ```
 
 ```java
-import rg.rawit.Invoker;
-import rg.rawit.Constructor;
+import rawit.Invoker;
+import rawit.Constructor;
 
 public class Foo {
 
