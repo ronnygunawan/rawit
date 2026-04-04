@@ -27,6 +27,11 @@ public class TerminalInterfaceSpec {
 
     private final AnnotatedMethod method;
 
+    /**
+     * Creates a new {@code TerminalInterfaceSpec} for the given annotated method.
+     *
+     * @param method the representative annotated method for this terminal stage
+     */
     public TerminalInterfaceSpec(final AnnotatedMethod method) {
         this.method = method;
     }

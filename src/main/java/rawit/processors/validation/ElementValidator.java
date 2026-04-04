@@ -21,6 +21,9 @@ import java.util.List;
  */
 public class ElementValidator {
 
+    /** Creates a new {@code ElementValidator}. */
+    public ElementValidator() {}
+
     /**
      * Validates the given annotated element and emits diagnostics for every violated rule.
      *

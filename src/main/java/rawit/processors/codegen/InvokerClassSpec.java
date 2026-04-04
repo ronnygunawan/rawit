@@ -40,6 +40,11 @@ public class InvokerClassSpec {
     private final boolean isInvoker;
     private final String callerClassName;
 
+    /**
+     * Creates a new {@code InvokerClassSpec} for the given merge tree.
+     *
+     * @param tree the merge tree describing the overload group to generate code for
+     */
     public InvokerClassSpec(final MergeTree tree) {
         this.tree = tree;
         // isInvoker is true for @Invoker annotations (including @Invoker on constructors)
@@ -50,6 +55,8 @@ public class InvokerClassSpec {
 
     /**
      * Builds and returns the Invoker_Class {@link TypeSpec}.
+     *
+     * @return the fully constructed {@link TypeSpec} for the Invoker_Class
      */
     public TypeSpec build() {
         final TypeSpec.Builder classBuilder = TypeSpec.classBuilder(callerClassName)

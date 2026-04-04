@@ -36,6 +36,7 @@ public sealed interface MergeNode permits MergeNode.SharedNode, MergeNode.Branch
     record BranchingNode(
             List<Branch> branches
     ) implements MergeNode {
+        /** Defensive copy; makes {@code branches} unmodifiable. */
         public BranchingNode {
             branches = List.copyOf(branches);
         }
@@ -51,6 +52,7 @@ public sealed interface MergeNode permits MergeNode.SharedNode, MergeNode.Branch
             List<AnnotatedMethod> overloads,
             MergeNode continuation
     ) implements MergeNode {
+        /** Defensive copy; makes {@code overloads} unmodifiable. */
         public TerminalNode {
             overloads = List.copyOf(overloads);
         }

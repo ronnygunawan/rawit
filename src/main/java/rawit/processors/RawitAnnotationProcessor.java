@@ -37,6 +37,9 @@ import java.util.*;
 @SupportedOptions("invoker.debug")
 public class RawitAnnotationProcessor extends AbstractProcessor {
 
+    /** Creates a new {@code RawitAnnotationProcessor}. */
+    public RawitAnnotationProcessor() {}
+
     private static final String INVOKER_ANNOTATION_FQN = "rawit.Invoker";
     private static final String CONSTRUCTOR_ANNOTATION_FQN = "rawit.Constructor";
 

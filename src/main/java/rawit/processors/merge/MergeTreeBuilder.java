@@ -36,6 +36,11 @@ public class MergeTreeBuilder {
 
     private final Messager messager;
 
+    /**
+     * Creates a new {@code MergeTreeBuilder}.
+     *
+     * @param messager the compiler messager used to emit conflict diagnostics
+     */
     public MergeTreeBuilder(final Messager messager) {
         this.messager = messager;
     }

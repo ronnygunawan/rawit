@@ -17,10 +17,13 @@ import java.util.Optional;
  */
 public class OverloadResolver {
 
+    /** Creates a new {@code OverloadResolver}. */
+    public OverloadResolver() {}
+
     /**
      * Resolves the {@code .class} file path for the given binary class name.
      *
-     * <p>Uses {@link javax.tools.Filer#getResource} with {@link StandardLocation#CLASS_OUTPUT}
+     * <p>Uses {@link javax.annotation.processing.Filer#getResource(javax.tools.JavaFileManager.Location, CharSequence, CharSequence)} with {@link StandardLocation#CLASS_OUTPUT}
      * to locate the {@code .class} file without any side effects (no probe files created).
      *
      * @param binaryClassName slash-separated binary class name, e.g. {@code "com/example/Foo"}

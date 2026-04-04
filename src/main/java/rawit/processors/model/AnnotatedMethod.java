@@ -32,8 +32,18 @@ public record AnnotatedMethod(
         List<String> checkedExceptions,
         int accessFlags
 ) {
-    /** Convenience constructor that defaults {@code accessFlags} to {@code ACC_PUBLIC} (0x0001)
-     *  and {@code isConstructorAnnotation} to {@code false}. */
+    /**
+     * Convenience constructor that defaults {@code accessFlags} to {@code ACC_PUBLIC} (0x0001)
+     * and {@code isConstructorAnnotation} to {@code false}.
+     *
+     * @param enclosingClassName   binary name of the enclosing class, e.g. {@code "com/example/Foo"}
+     * @param methodName           simple method name, e.g. {@code "bar"} or {@code "<init>"}
+     * @param isStatic             {@code true} if the method is declared {@code static}
+     * @param isConstructor        {@code true} if this represents a constructor
+     * @param parameters           ordered list of parameters
+     * @param returnTypeDescriptor JVM return type descriptor, e.g. {@code "I"} or {@code "V"}
+     * @param checkedExceptions    binary names of declared checked exception types
+     */
     public AnnotatedMethod(
             String enclosingClassName,
             String methodName,
@@ -47,7 +57,18 @@ public record AnnotatedMethod(
                 parameters, returnTypeDescriptor, checkedExceptions, 0x0001 /* ACC_PUBLIC */);
     }
 
-    /** Convenience constructor that defaults {@code accessFlags} to {@code ACC_PUBLIC} (0x0001). */
+    /**
+     * Convenience constructor that defaults {@code accessFlags} to {@code ACC_PUBLIC} (0x0001).
+     *
+     * @param enclosingClassName      binary name of the enclosing class, e.g. {@code "com/example/Foo"}
+     * @param methodName              simple method name, e.g. {@code "bar"} or {@code "<init>"}
+     * @param isStatic                {@code true} if the method is declared {@code static}
+     * @param isConstructor           {@code true} if this represents a constructor
+     * @param parameters              ordered list of parameters
+     * @param returnTypeDescriptor    JVM return type descriptor, e.g. {@code "I"} or {@code "V"}
+     * @param checkedExceptions       binary names of declared checked exception types
+     * @param accessFlags             ASM access flags (e.g. {@code Opcodes.ACC_PUBLIC})
+     */
     public AnnotatedMethod(
             String enclosingClassName,
             String methodName,
@@ -62,6 +83,7 @@ public record AnnotatedMethod(
                 parameters, returnTypeDescriptor, checkedExceptions, accessFlags);
     }
 
+    /** Defensive copy constructor; copies {@code parameters} and {@code checkedExceptions}. */
     public AnnotatedMethod {
         parameters = List.copyOf(parameters);
         checkedExceptions = List.copyOf(checkedExceptions);

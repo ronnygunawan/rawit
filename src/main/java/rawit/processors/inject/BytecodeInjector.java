@@ -34,6 +34,9 @@ import java.util.Set;
  */
 public class BytecodeInjector {
 
+    /** Creates a new {@code BytecodeInjector}. */
+    public BytecodeInjector() {}
+
     /**
      * Injects parameterless overloads for all provided merge trees into the {@code .class} file
      * at the given path.

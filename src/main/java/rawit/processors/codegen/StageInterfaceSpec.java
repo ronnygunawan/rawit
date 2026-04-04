@@ -35,6 +35,11 @@ public class StageInterfaceSpec {
     private final MergeTree tree;
     private final boolean isInvoker;
 
+    /**
+     * Creates a new {@code StageInterfaceSpec} for the given merge tree.
+     *
+     * @param tree the merge tree to generate stage interfaces for
+     */
     public StageInterfaceSpec(final MergeTree tree) {
         this.tree = tree;
         // isInvoker is true for @Invoker annotations (including @Invoker on constructors)

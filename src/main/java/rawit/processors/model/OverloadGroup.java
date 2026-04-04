@@ -14,6 +14,7 @@ public record OverloadGroup(
         String groupName,
         List<AnnotatedMethod> members
 ) {
+    /** Defensive copy; makes {@code members} unmodifiable. */
     public OverloadGroup {
         members = List.copyOf(members);
     }

@@ -26,6 +26,11 @@ public class JavaPoetGenerator {
 
     private final Messager messager;
 
+    /**
+     * Creates a new {@code JavaPoetGenerator}.
+     *
+     * @param messager the compiler messager used to emit diagnostics
+     */
     public JavaPoetGenerator(final Messager messager) {
         this.messager = messager;
     }
