@@ -22,6 +22,7 @@ foo.bar().x(10).y(20).invoke();
 
 - **`@Invoker`** — turns any non-private method (instance or static) into a staged call chain ending with `.invoke()`
 - **`@Constructor`** — injects a `public static constructor()` entry point for staged object construction ending with `.construct()`. Works on explicit constructors and directly on **record types**
+- **`@Getter`** — generates public getter methods for annotated fields. Follows the Lombok `is`-prefix convention for primitive `boolean`, supports static fields, and handles field hiding with covariant return types
 - Works on **instance methods** and **static methods** (`@Invoker`), **constructors**, and **record type declarations** (`@Constructor`)
 - Supports **overload groups** — multiple overloads with the same name share a single entry point and branch only where their signatures diverge
 - **Zero runtime dependency** — the processor runs at compile time only
@@ -283,6 +284,56 @@ Config cfg = Config.constructor()
 
 Records with zero components are rejected at compile time (`staged construction requires at least one record component`). Placing `@Constructor` on a non-record type (class, interface, enum) is also a compile-time error.
 
+### `@Getter`
+
+Place on any **field** (instance or static, any visibility) to generate a public getter method.
+
+```java
+import rawit.Getter;
+
+public class User {
+
+    @Getter private String name;
+    @Getter private static int instanceCount;
+    @Getter private boolean active;
+    @Getter private Boolean verified;
+}
+```
+
+The processor injects getter methods directly into the `.class` file:
+
+```java
+User user = new User();
+user.getName();              // String getter
+User.getInstanceCount();     // static getter
+user.isActive();             // primitive boolean → is-prefix
+user.getVerified();          // boxed Boolean → get-prefix
+```
+
+#### Primitive `boolean` naming rules
+
+| Field Name | Getter Name | Rule |
+|---|---|---|
+| `active` | `isActive()` | No `is` prefix → `is` + capitalize |
+| `isActive` | `isActive()` | `is` + uppercase letter → use field name as-is |
+| `isinTimezone` | `isIsinTimezone()` | `is` + non-uppercase letter → `is` + capitalize |
+
+Boxed `Boolean` and all other types always use the `get` prefix.
+
+#### Field hiding in inheritance
+
+When a subclass hides a superclass field and both are annotated with `@Getter`, the processor generates an overriding getter on the subclass. Covariant return types are supported (e.g., base returns `Number`, derived returns `Integer`). Incompatible return types produce a compile-time error.
+
+```java
+public class Base {
+    @Getter protected Number value;
+}
+
+public class Derived extends Base {
+    @Getter protected Integer value; // covariant override — OK
+}
+```
+
 ---
 
 ## 🔀 Overload Groups
@@ -318,6 +369,13 @@ Rawit catches mistakes early. You'll get a clear `javac` error for:
 | `@Constructor` on a record with existing `constructor()` method | `a parameterless overload named 'constructor' already exists` |
 | A `bar()` overload already exists | `a parameterless overload named 'bar' already exists` |
 | Same parameter name with conflicting types across overloads | conflict error with details |
+| `@Getter` on a `volatile` field | `@Getter is not supported on volatile fields` |
+| `@Getter` on a `transient` field | `@Getter is not supported on transient fields` |
+| `@Getter` on a field inside an anonymous class | `@Getter is not supported inside anonymous classes` |
+| `@Getter` field conflicts with existing same-class method | `getter 'name()' conflicts with existing method in Class` |
+| Two `@Getter` fields produce the same getter name | `getter 'name()' conflicts with another @Getter field in Class` |
+| `@Getter` field conflicts with inherited method | `getter 'name()' conflicts with inherited method from SuperClass` |
+| Incompatible return type in field-hiding override | `getter 'name()' in Derived cannot override getter in Base: incompatible return types` |
 
 ---
 
