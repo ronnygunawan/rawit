@@ -70,38 +70,36 @@ public class StageInterfaceSpec {
     ) {
         if (node == null) return;
 
-        switch (node) {
-            case SharedNode shared -> {
-                final String ifaceName = stageInterfaceName(shared.paramName(), prevParamName, position, false);
-                final TypeName returnType = nextTypeName(shared.next(), shared.paramName(), position + 1);
-                final TypeSpec iface = buildSingleMethodInterface(
-                        ifaceName, shared.paramName(), shared.typeDescriptor(), returnType);
-                out.add(iface);
-                buildInterfaces(shared.next(), shared.paramName(), position + 1, out);
+        if (node instanceof SharedNode shared) {
+            final String ifaceName = stageInterfaceName(shared.paramName(), prevParamName, position, false);
+            final TypeName returnType = nextTypeName(shared.next(), shared.paramName(), position + 1);
+            final TypeSpec iface = buildSingleMethodInterface(
+                    ifaceName, shared.paramName(), shared.typeDescriptor(), returnType);
+            out.add(iface);
+            buildInterfaces(shared.next(), shared.paramName(), position + 1, out);
+        } else if (node instanceof BranchingNode branching) {
+            final String ifaceName = branchingInterfaceName(prevParamName, position);
+            final TypeSpec iface = buildBranchingInterface(ifaceName, branching, position);
+            out.add(iface);
+            // Recurse into each branch
+            for (final MergeNode.Branch branch : branching.branches()) {
+                buildInterfaces(branch.next(), branch.paramName(), position + 1, out);
             }
-            case BranchingNode branching -> {
-                final String ifaceName = branchingInterfaceName(prevParamName, position);
-                final TypeSpec iface = buildBranchingInterface(ifaceName, branching, position);
-                out.add(iface);
-                // Recurse into each branch
-                for (final MergeNode.Branch branch : branching.branches()) {
-                    buildInterfaces(branch.next(), branch.paramName(), position + 1, out);
-                }
+        } else if (node instanceof TerminalNode terminal) {
+            // If there's a continuation, generate a combined interface that exposes both
+            // invoke()/construct() and the next-stage method(s)
+            if (terminal.continuation() != null) {
+                // Generate the combined interface
+                final String combinedIfaceName = combinedInterfaceName(prevParamName, position);
+                final TypeSpec combinedIface = buildCombinedInterface(
+                        combinedIfaceName, terminal.continuation(), prevParamName, position);
+                out.add(combinedIface);
+                // Recurse into the continuation to generate its stage interfaces
+                buildInterfaces(terminal.continuation(), prevParamName, position, out);
             }
-            case TerminalNode terminal -> {
-                // If there's a continuation, generate a combined interface that exposes both
-                // invoke()/construct() and the next-stage method(s)
-                if (terminal.continuation() != null) {
-                    // Generate the combined interface
-                    final String combinedIfaceName = combinedInterfaceName(prevParamName, position);
-                    final TypeSpec combinedIface = buildCombinedInterface(
-                            combinedIfaceName, terminal.continuation(), prevParamName, position);
-                    out.add(combinedIface);
-                    // Recurse into the continuation to generate its stage interfaces
-                    buildInterfaces(terminal.continuation(), prevParamName, position, out);
-                }
-                // Terminal itself is handled by TerminalInterfaceSpec — no stage interface here
-            }
+            // Terminal itself is handled by TerminalInterfaceSpec — no stage interface here
+        } else {
+            throw new IllegalStateException("Unexpected merge node: " + node);
         }
     }
 
@@ -219,25 +217,22 @@ public class StageInterfaceSpec {
             // Should not happen in a well-formed tree, but guard anyway
             return terminalTypeName();
         }
-        return switch (nextNode) {
-            case SharedNode shared -> {
-                final String name = stageInterfaceName(shared.paramName(), currentParamName, nextPosition, false);
-                yield com.squareup.javapoet.ClassName.bestGuess(name);
+        if (nextNode instanceof SharedNode shared) {
+            final String name = stageInterfaceName(shared.paramName(), currentParamName, nextPosition, false);
+            return com.squareup.javapoet.ClassName.bestGuess(name);
+        } else if (nextNode instanceof BranchingNode branching) {
+            final String name = branchingInterfaceName(currentParamName, nextPosition);
+            return com.squareup.javapoet.ClassName.bestGuess(name);
+        } else if (nextNode instanceof TerminalNode terminal) {
+            if (terminal.continuation() != null) {
+                // The terminal node also has a continuation — the return type is the
+                // combined interface that exposes both invoke() and the continuation's methods
+                return com.squareup.javapoet.ClassName.bestGuess(
+                        combinedInterfaceName(currentParamName, nextPosition));
             }
-            case BranchingNode branching -> {
-                final String name = branchingInterfaceName(currentParamName, nextPosition);
-                yield com.squareup.javapoet.ClassName.bestGuess(name);
-            }
-            case TerminalNode terminal -> {
-                if (terminal.continuation() != null) {
-                    // The terminal node also has a continuation — the return type is the
-                    // combined interface that exposes both invoke() and the continuation's methods
-                    yield com.squareup.javapoet.ClassName.bestGuess(
-                            combinedInterfaceName(currentParamName, nextPosition));
-                }
-                yield terminalTypeName();
-            }
-        };
+            return terminalTypeName();
+        }
+        throw new IllegalStateException("Unexpected MergeNode type: " + nextNode.getClass());
     }
 
     private TypeName terminalTypeName() {
@@ -279,20 +274,19 @@ public class StageInterfaceSpec {
         builder.addSuperinterface(terminalTypeName());
 
         // Add the continuation's stage methods
-        switch (continuation) {
-            case SharedNode shared -> {
-                final TypeName returnType = nextTypeName(shared.next(), shared.paramName(), position + 1);
-                builder.addMethod(buildStageMethod(shared.paramName(), shared.typeDescriptor(), returnType));
+        if (continuation instanceof SharedNode shared) {
+            final TypeName returnType = nextTypeName(shared.next(), shared.paramName(), position + 1);
+            builder.addMethod(buildStageMethod(shared.paramName(), shared.typeDescriptor(), returnType));
+        } else if (continuation instanceof BranchingNode branching) {
+            for (final MergeNode.Branch branch : branching.branches()) {
+                final TypeName returnType = nextTypeName(branch.next(), branch.paramName(), position + 1);
+                builder.addMethod(buildStageMethod(branch.paramName(), branch.typeDescriptor(), returnType));
             }
-            case BranchingNode branching -> {
-                for (final MergeNode.Branch branch : branching.branches()) {
-                    final TypeName returnType = nextTypeName(branch.next(), branch.paramName(), position + 1);
-                    builder.addMethod(buildStageMethod(branch.paramName(), branch.typeDescriptor(), returnType));
-                }
-            }
-            case TerminalNode terminal -> {
-                // Nested terminal — shouldn't happen in practice
-            }
+        } else if (continuation instanceof TerminalNode) {
+            throw new IllegalStateException(
+                    "Unexpected terminal continuation while building combined interface '"
+                            + ifaceName + "' for previous parameter '" + prevParamName
+                            + "' at position " + position);
         }
 
         return builder.build();

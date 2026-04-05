@@ -56,38 +56,35 @@ class MergeTreeBuilderPropertyTest {
     /** Counts the total number of SharedNode + BranchingNode + TerminalNode in a tree. */
     private static int countNodes(MergeNode node) {
         if (node == null) return 0;
-        return switch (node) {
-            case SharedNode s -> 1 + countNodes(s.next());
-            case BranchingNode b -> 1 + b.branches().stream().mapToInt(br -> countNodes(br.next())).sum();
-            case TerminalNode t -> 1 + countNodes(t.continuation());
-        };
+        if (node instanceof SharedNode s) return 1 + countNodes(s.next());
+        if (node instanceof BranchingNode b) return 1 + b.branches().stream().mapToInt(br -> countNodes(br.next())).sum();
+        if (node instanceof TerminalNode t) return 1 + countNodes(t.continuation());
+        throw new IllegalStateException("Unexpected MergeNode type: " + node.getClass());
     }
 
     /** Collects all TerminalNodes reachable from a root. */
     private static List<TerminalNode> collectTerminals(MergeNode node) {
         if (node == null) return List.of();
-        return switch (node) {
-            case SharedNode s -> collectTerminals(s.next());
-            case BranchingNode b -> b.branches().stream()
-                    .flatMap(br -> collectTerminals(br.next()).stream())
-                    .toList();
-            case TerminalNode t -> {
-                List<TerminalNode> result = new ArrayList<>();
-                result.add(t);
-                result.addAll(collectTerminals(t.continuation()));
-                yield result;
-            }
-        };
+        if (node instanceof SharedNode s) return collectTerminals(s.next());
+        if (node instanceof BranchingNode b) return b.branches().stream()
+                .flatMap(br -> collectTerminals(br.next()).stream())
+                .toList();
+        if (node instanceof TerminalNode t) {
+            List<TerminalNode> result = new ArrayList<>();
+            result.add(t);
+            result.addAll(collectTerminals(t.continuation()));
+            return result;
+        }
+        throw new IllegalStateException("Unexpected MergeNode type: " + node.getClass());
     }
 
     /** Walks the tree and returns the first node at the given depth (0 = root). */
     private static MergeNode nodeAtDepth(MergeNode node, int depth) {
         if (node == null || depth == 0) return node;
-        return switch (node) {
-            case SharedNode s -> nodeAtDepth(s.next(), depth - 1);
-            case BranchingNode b -> b.branches().isEmpty() ? null : nodeAtDepth(b.branches().get(0).next(), depth - 1);
-            case TerminalNode t -> nodeAtDepth(t.continuation(), depth - 1);
-        };
+        if (node instanceof SharedNode s) return nodeAtDepth(s.next(), depth - 1);
+        if (node instanceof BranchingNode b) return b.branches().isEmpty() ? null : nodeAtDepth(b.branches().get(0).next(), depth - 1);
+        if (node instanceof TerminalNode t) return nodeAtDepth(t.continuation(), depth - 1);
+        throw new IllegalStateException("Unexpected MergeNode type: " + node.getClass());
     }
 
     // -------------------------------------------------------------------------

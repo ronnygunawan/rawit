@@ -120,24 +120,46 @@ public class InvokerClassSpec {
     ) {
         if (node == null) return;
 
-        switch (node) {
-            case SharedNode shared -> {
-                // Generate the stage method on the current class
-                final TypeName paramType = TerminalInterfaceSpec.descriptorToTypeName(shared.typeDescriptor());
-                final TypeName returnType = nextStageTypeName(shared.next(), shared.paramName(), accumulated.size() + 1);
+        if (node instanceof SharedNode shared) {
+            // Generate the stage method on the current class
+            final TypeName paramType = TerminalInterfaceSpec.descriptorToTypeName(shared.typeDescriptor());
+            final TypeName returnType = nextStageTypeName(shared.next(), shared.paramName(), accumulated.size() + 1);
 
-                // Build the accumulator class name: CallerClass$With<PascalParam1><PascalParam2>...
-                final List<Parameter> nextAccumulated = append(accumulated, new Parameter(shared.paramName(), shared.typeDescriptor()));
+            // Build the accumulator class name: CallerClass$With<PascalParam1><PascalParam2>...
+            final List<Parameter> nextAccumulated = append(accumulated, new Parameter(shared.paramName(), shared.typeDescriptor()));
+            final String accClassName = accumulatorClassName(nextAccumulated);
+
+            final MethodSpec.Builder stageMethod = MethodSpec.methodBuilder(shared.paramName())
+                    .addModifiers(Modifier.PUBLIC)
+                    .returns(returnType)
+                    .addParameter(paramType, shared.paramName())
+                    .addStatement("return new $L($L)", accClassName, buildAccumulatorArgs(accumulated, shared.paramName(), representative));
+
+            // Add @Override only when the current class implements the stage interface
+            // (i.e., when we're inside an accumulator class, not the top-level Invoker_Class)
+            if (!accumulated.isEmpty()) {
+                stageMethod.addAnnotation(Override.class);
+            }
+
+            addCheckedExceptions(stageMethod, representative);
+            classBuilder.addMethod(stageMethod.build());
+
+            // Build the accumulator class for the next stage (recursion is handled inside)
+            final TypeSpec acc = buildAccumulatorClass(accClassName, nextAccumulated, shared.next(), representative);
+            accumulators.add(acc);
+        } else if (node instanceof BranchingNode branching) {
+            for (final MergeNode.Branch branch : branching.branches()) {
+                final TypeName paramType = TerminalInterfaceSpec.descriptorToTypeName(branch.typeDescriptor());
+                final TypeName returnType = nextStageTypeName(branch.next(), branch.paramName(), accumulated.size() + 1);
+                final List<Parameter> nextAccumulated = append(accumulated, new Parameter(branch.paramName(), branch.typeDescriptor()));
                 final String accClassName = accumulatorClassName(nextAccumulated);
 
-                final MethodSpec.Builder stageMethod = MethodSpec.methodBuilder(shared.paramName())
+                final MethodSpec.Builder stageMethod = MethodSpec.methodBuilder(branch.paramName())
                         .addModifiers(Modifier.PUBLIC)
                         .returns(returnType)
-                        .addParameter(paramType, shared.paramName())
-                        .addStatement("return new $L($L)", accClassName, buildAccumulatorArgs(accumulated, shared.paramName(), representative));
+                        .addParameter(paramType, branch.paramName())
+                        .addStatement("return new $L($L)", accClassName, buildAccumulatorArgs(accumulated, branch.paramName(), representative));
 
-                // Add @Override only when the current class implements the stage interface
-                // (i.e., when we're inside an accumulator class, not the top-level Invoker_Class)
                 if (!accumulated.isEmpty()) {
                     stageMethod.addAnnotation(Override.class);
                 }
@@ -145,43 +167,19 @@ public class InvokerClassSpec {
                 addCheckedExceptions(stageMethod, representative);
                 classBuilder.addMethod(stageMethod.build());
 
-                // Build the accumulator class for the next stage (recursion is handled inside)
-                final TypeSpec acc = buildAccumulatorClass(accClassName, nextAccumulated, shared.next(), representative);
+                final TypeSpec acc = buildAccumulatorClass(accClassName, nextAccumulated, branch.next(), representative);
                 accumulators.add(acc);
             }
-            case BranchingNode branching -> {
-                for (final MergeNode.Branch branch : branching.branches()) {
-                    final TypeName paramType = TerminalInterfaceSpec.descriptorToTypeName(branch.typeDescriptor());
-                    final TypeName returnType = nextStageTypeName(branch.next(), branch.paramName(), accumulated.size() + 1);
-                    final List<Parameter> nextAccumulated = append(accumulated, new Parameter(branch.paramName(), branch.typeDescriptor()));
-                    final String accClassName = accumulatorClassName(nextAccumulated);
+        } else if (node instanceof TerminalNode terminal) {
+            // Generate invoke()/construct() method on the current class
+            buildTerminalMethod(classBuilder, accumulated, terminal.overloads().get(0));
 
-                    final MethodSpec.Builder stageMethod = MethodSpec.methodBuilder(branch.paramName())
-                            .addModifiers(Modifier.PUBLIC)
-                            .returns(returnType)
-                            .addParameter(paramType, branch.paramName())
-                            .addStatement("return new $L($L)", accClassName, buildAccumulatorArgs(accumulated, branch.paramName(), representative));
-
-                    if (!accumulated.isEmpty()) {
-                        stageMethod.addAnnotation(Override.class);
-                    }
-
-                    addCheckedExceptions(stageMethod, representative);
-                    classBuilder.addMethod(stageMethod.build());
-
-                    final TypeSpec acc = buildAccumulatorClass(accClassName, nextAccumulated, branch.next(), representative);
-                    accumulators.add(acc);
-                }
+            // If there's a continuation, also generate the next-stage method
+            if (terminal.continuation() != null) {
+                buildStageImplementations(classBuilder, accumulators, terminal.continuation(), accumulated, representative);
             }
-            case TerminalNode terminal -> {
-                // Generate invoke()/construct() method on the current class
-                buildTerminalMethod(classBuilder, accumulated, terminal.overloads().get(0));
-
-                // If there's a continuation, also generate the next-stage method
-                if (terminal.continuation() != null) {
-                    buildStageImplementations(classBuilder, accumulators, terminal.continuation(), accumulated, representative);
-                }
-            }
+        } else {
+            throw new IllegalStateException("Unexpected MergeNode type: " + node.getClass());
         }
     }
 

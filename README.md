@@ -4,7 +4,7 @@
 
 > Compile-time staged invocation for Java — fluent, type-safe call chains at compile time.
 
-Rawit is a Java 21 annotation processor that transforms your methods and constructors into
+Rawit is a Java 17+ annotation processor that transforms your methods and constructors into
 fluent, type-safe call chains at compile time. No runtime overhead, no reflection magic —
 just clean, compiler-enforced APIs generated straight into your `.class` files.
 
@@ -45,7 +45,6 @@ foo.bar().x(10).y(20).invoke();
 #### Gradle Groovy DSL
 
 ```groovy
-// Groovy DSL
 dependencies {
     annotationProcessor 'io.github.ronnygunawan:rawit:VERSION'
     compileOnly 'io.github.ronnygunawan:rawit:VERSION'
@@ -55,20 +54,62 @@ dependencies {
 #### Gradle Kotlin DSL
 
 ```kotlin
-// Kotlin DSL
 dependencies {
     annotationProcessor("io.github.ronnygunawan:rawit:VERSION")
     compileOnly("io.github.ronnygunawan:rawit:VERSION")
 }
 ```
 
+> **Gradle two-pass compile:** Rawit injects entry points into existing `.class` files, so the
+> declaring class must be compiled *before* annotation processing runs. Configure a two-pass
+> compile in your `build.gradle` / `build.gradle.kts`:
+>
+> **Groovy DSL (`build.gradle`)**
+> ```groovy
+> // Pass 1: compile without annotation processing
+> compileJava {
+>     options.compilerArgs << '-proc:none'
+> }
+>
+> // Pass 2: run annotation processing against already-compiled classes
+> task processAnnotations(type: JavaCompile, dependsOn: compileJava) {
+>     source = sourceSets.main.java
+>     classpath = sourceSets.main.compileClasspath
+>     destinationDirectory = sourceSets.main.output.classesDirs.singleFile
+>     options.annotationProcessorPath = configurations.annotationProcessor
+>     options.compilerArgs = ['-proc:only']
+> }
+>
+> classes.dependsOn processAnnotations
+> ```
+>
+> **Kotlin DSL (`build.gradle.kts`)**
+> ```kotlin
+> tasks.compileJava {
+>     options.compilerArgs.add("-proc:none")
+> }
+>
+> val processAnnotations by tasks.registering(JavaCompile::class) {
+>     dependsOn(tasks.compileJava)
+>     source = sourceSets.main.get().java
+>     classpath = sourceSets.main.get().compileClasspath
+>     destinationDirectory.set(sourceSets.main.get().output.classesDirs.singleFile)
+>     options.annotationProcessorPath = configurations.annotationProcessor.get()
+>     options.compilerArgs = listOf("-proc:only")
+> }
+>
+> tasks.classes {
+>     dependsOn(processAnnotations)
+> }
+> ```
+
 ### 2. Annotate your methods
 
-> **Build requirement:** Rawit injects generated entry points into existing `.class` files, which
-> means the declaring class must be compiled *before* annotation processing runs. In a standard
-> single-pass `javac`/Maven compile, annotation processing runs before `.class` files are written,
+> **Maven two-pass compile:** Rawit injects generated entry points into existing `.class` files,
+> which means the declaring class must be compiled *before* annotation processing runs. In a
+> standard single-pass Maven compile, annotation processing runs before `.class` files are written,
 > so injection is skipped silently on the first pass. To enable injection, configure a **two-pass
-> compile** in your `pom.xml`:
+> compile** in your `pom.xml` (Gradle users: see the Gradle setup above):
 >
 > ```xml
 > <!-- Pass 1: compile sources without annotation processing -->
@@ -226,7 +267,7 @@ Rawit catches mistakes early. You'll get a clear `javac` error for:
 
 ## 🛠️ Building from Source
 
-Requires **Java 21** and **Maven 3.8+**.
+Requires **Java 17** and **Maven 3.8+**.
 
 ```bash
 git clone https://github.com/ronnygunawan/rawit.git
