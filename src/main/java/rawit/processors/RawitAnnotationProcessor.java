@@ -1,21 +1,25 @@
 package rawit.processors;
 
 import rawit.processors.codegen.JavaPoetGenerator;
+import rawit.processors.getter.GetterCollisionDetector;
+import rawit.processors.getter.GetterNameResolver;
 import rawit.processors.inject.BytecodeInjector;
+import rawit.processors.inject.GetterBytecodeInjector;
 import rawit.processors.inject.OverloadResolver;
 import rawit.processors.merge.MergeTreeBuilder;
+import rawit.processors.model.AnnotatedField;
 import rawit.processors.model.AnnotatedMethod;
 import rawit.processors.model.MergeTree;
 import rawit.processors.model.OverloadGroup;
 import rawit.processors.model.Parameter;
 import rawit.processors.validation.ElementValidator;
+import rawit.processors.validation.GetterValidator;
 import rawit.processors.validation.ValidationResult;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.*;
 import javax.tools.Diagnostic;
 import java.nio.file.Path;
 import java.util.*;
@@ -42,12 +46,17 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
 
     private static final String INVOKER_ANNOTATION_FQN = "rawit.Invoker";
     private static final String CONSTRUCTOR_ANNOTATION_FQN = "rawit.Constructor";
+    private static final String GETTER_ANNOTATION_FQN = "rawit.Getter";
 
     private Messager messager;
     private ElementValidator elementValidator;
     private JavaPoetGenerator javaPoetGenerator;
     private BytecodeInjector bytecodeInjector;
     private OverloadResolver overloadResolver;
+    private GetterValidator getterValidator;
+    private GetterNameResolver getterNameResolver;
+    private GetterCollisionDetector getterCollisionDetector;
+    private GetterBytecodeInjector getterBytecodeInjector;
 
     @Override
     public final synchronized void init(final ProcessingEnvironment processingEnv) {
@@ -57,11 +66,15 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
         this.javaPoetGenerator = new JavaPoetGenerator(messager);
         this.bytecodeInjector = new BytecodeInjector();
         this.overloadResolver = new OverloadResolver();
+        this.getterValidator = new GetterValidator();
+        this.getterNameResolver = new GetterNameResolver();
+        this.getterCollisionDetector = new GetterCollisionDetector();
+        this.getterBytecodeInjector = new GetterBytecodeInjector();
     }
 
     @Override
     public final Set<String> getSupportedAnnotationTypes() {
-        return Set.of(INVOKER_ANNOTATION_FQN, CONSTRUCTOR_ANNOTATION_FQN);
+        return Set.of(INVOKER_ANNOTATION_FQN, CONSTRUCTOR_ANNOTATION_FQN, GETTER_ANNOTATION_FQN);
     }
 
     @Override
@@ -77,6 +90,90 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
         }
 
         final boolean debug = isDebugEnabled();
+
+        // --- @Getter processing ---
+        final List<AnnotatedField> validGetterFields = new ArrayList<>();
+        final Map<TypeElement, List<AnnotatedField>> getterFieldsByClass = new LinkedHashMap<>();
+
+        for (final TypeElement annotation : annotations) {
+            if (!GETTER_ANNOTATION_FQN.equals(annotation.getQualifiedName().toString())) {
+                continue;
+            }
+
+            for (final Element element : roundEnv.getElementsAnnotatedWith(annotation)) {
+                // Step 1: Validate
+                final ValidationResult result = getterValidator.validate(element, messager);
+                if (result instanceof ValidationResult.Invalid) {
+                    continue;
+                }
+
+                // Step 2: Build AnnotatedField model
+                if (!(element instanceof VariableElement varElement)) {
+                    continue;
+                }
+                final Element enclosing = varElement.getEnclosingElement();
+                if (!(enclosing instanceof TypeElement enclosingType)) {
+                    continue;
+                }
+
+                final String enclosingClassName = toBinaryName(enclosingType);
+                final String fieldName = varElement.getSimpleName().toString();
+                final String fieldTypeDescriptor = toTypeDescriptor(varElement.asType());
+                final String fieldTypeSignature = toTypeSignature(varElement.asType());
+                final boolean isStatic = varElement.getModifiers().contains(Modifier.STATIC);
+                final String getterName = getterNameResolver.resolve(fieldName, fieldTypeDescriptor);
+
+                final AnnotatedField field = new AnnotatedField(
+                        enclosingClassName, fieldName, fieldTypeDescriptor,
+                        fieldTypeSignature, isStatic, getterName);
+
+                getterFieldsByClass.computeIfAbsent(enclosingType, k -> new ArrayList<>()).add(field);
+            }
+        }
+
+        // Step 3: Collision detection per class
+        for (final Map.Entry<TypeElement, List<AnnotatedField>> entry : getterFieldsByClass.entrySet()) {
+            final TypeElement enclosingClass = entry.getKey();
+            final List<AnnotatedField> classFields = entry.getValue();
+
+            final List<AnnotatedField> passed = getterCollisionDetector.detect(
+                    classFields, enclosingClass, messager,
+                    processingEnv.getTypeUtils());
+
+            validGetterFields.addAll(passed);
+        }
+
+        // Step 4: Group valid fields by enclosing class and inject
+        final Map<String, List<AnnotatedField>> gettersByClassName = new LinkedHashMap<>();
+        for (final AnnotatedField field : validGetterFields) {
+            gettersByClassName.computeIfAbsent(field.enclosingClassName(), k -> new ArrayList<>())
+                    .add(field);
+        }
+
+        for (final Map.Entry<String, List<AnnotatedField>> entry : gettersByClassName.entrySet()) {
+            final String enclosingClassName = entry.getKey();
+            final List<AnnotatedField> classFields = entry.getValue();
+
+            // Step 5: Resolve .class file path
+            final Optional<Path> classFilePath = overloadResolver.resolve(enclosingClassName, processingEnv);
+            if (classFilePath.isEmpty()) {
+                if (debug) {
+                    messager.printMessage(Diagnostic.Kind.NOTE,
+                            "[invoker.debug] .class file not found for "
+                                    + enclosingClassName.replace('/', '.')
+                                    + " — skipping @Getter bytecode injection");
+                }
+                continue;
+            }
+
+            // Step 6: Inject getter methods
+            if (debug) {
+                messager.printMessage(Diagnostic.Kind.NOTE,
+                        "[invoker.debug] Injecting @Getter methods into: " + classFilePath.get());
+            }
+
+            getterBytecodeInjector.inject(classFilePath.get(), classFields, processingEnv);
+        }
 
         // --- Stage 1: Collect and validate annotated elements ---
         final List<AnnotatedMethod> validMethods = new ArrayList<>();
@@ -410,6 +507,101 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                 // Type variables and wildcards are erased to Object at the JVM level.
                 // Other unknown kinds also fall back to Object to avoid invalid descriptors.
                 yield "Ljava/lang/Object;";
+            }
+        };
+    }
+
+    /**
+     * Computes the JVM generic type signature for a {@link TypeMirror}, or {@code null}
+     * if the type is not generic (i.e. has no type arguments, is not a type variable,
+     * and is not an array of a generic component).
+     *
+     * <p>This is used for the {@code fieldTypeSignature} in {@link AnnotatedField} to
+     * preserve generic type information in the generated getter method's signature attribute.
+     */
+    private String toTypeSignature(final TypeMirror type) {
+        return switch (type.getKind()) {
+            case DECLARED -> {
+                final DeclaredType declared = (DeclaredType) type;
+                final List<? extends TypeMirror> typeArgs = declared.getTypeArguments();
+                if (typeArgs.isEmpty()) {
+                    yield null; // non-generic declared type
+                }
+                final TypeElement typeElement = (TypeElement) declared.asElement();
+                final String binaryName = processingEnv.getElementUtils()
+                        .getBinaryName(typeElement).toString();
+                final StringBuilder sb = new StringBuilder();
+                sb.append('L').append(binaryName.replace('.', '/'));
+                sb.append('<');
+                for (final TypeMirror arg : typeArgs) {
+                    sb.append(toGenericSignatureComponent(arg));
+                }
+                sb.append('>').append(';');
+                yield sb.toString();
+            }
+            case TYPEVAR -> {
+                final TypeVariable tv = (TypeVariable) type;
+                yield "T" + tv.asElement().getSimpleName() + ";";
+            }
+            case ARRAY -> {
+                final ArrayType arr = (ArrayType) type;
+                final String componentSig = toTypeSignature(arr.getComponentType());
+                if (componentSig != null) {
+                    yield "[" + componentSig;
+                }
+                yield null; // non-generic array
+            }
+            default -> null;
+        };
+    }
+
+    /**
+     * Converts a type argument {@link TypeMirror} to its JVM generic signature component.
+     * Handles declared types (with or without type args), type variables, wildcards, and arrays.
+     */
+    private String toGenericSignatureComponent(final TypeMirror type) {
+        return switch (type.getKind()) {
+            case DECLARED -> {
+                final DeclaredType declared = (DeclaredType) type;
+                final TypeElement typeElement = (TypeElement) declared.asElement();
+                final String binaryName = processingEnv.getElementUtils()
+                        .getBinaryName(typeElement).toString();
+                final List<? extends TypeMirror> typeArgs = declared.getTypeArguments();
+                if (typeArgs.isEmpty()) {
+                    yield "L" + binaryName.replace('.', '/') + ";";
+                }
+                final StringBuilder sb = new StringBuilder();
+                sb.append('L').append(binaryName.replace('.', '/'));
+                sb.append('<');
+                for (final TypeMirror arg : typeArgs) {
+                    sb.append(toGenericSignatureComponent(arg));
+                }
+                sb.append('>').append(';');
+                yield sb.toString();
+            }
+            case TYPEVAR -> {
+                final TypeVariable tv = (TypeVariable) type;
+                yield "T" + tv.asElement().getSimpleName() + ";";
+            }
+            case WILDCARD -> {
+                final WildcardType wc = (WildcardType) type;
+                final TypeMirror extendsBound = wc.getExtendsBound();
+                final TypeMirror superBound = wc.getSuperBound();
+                if (extendsBound != null) {
+                    yield "+" + toGenericSignatureComponent(extendsBound);
+                } else if (superBound != null) {
+                    yield "-" + toGenericSignatureComponent(superBound);
+                } else {
+                    yield "*";
+                }
+            }
+            case ARRAY -> {
+                final ArrayType arr = (ArrayType) type;
+                yield "[" + toGenericSignatureComponent(arr.getComponentType());
+            }
+            default -> {
+                // Primitives and other kinds — use descriptor form
+                yield toTypeDescriptor(type);
             }
         };
     }
