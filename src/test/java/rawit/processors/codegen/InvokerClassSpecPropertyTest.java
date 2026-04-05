@@ -72,12 +72,12 @@ class InvokerClassSpecPropertyTest {
     }
 
     // -------------------------------------------------------------------------
-    // Property 2: Caller_Class name is unchanged
-    // Feature: curry-to-invoker-rename, Property 2: Caller_Class name is unchanged
+    // Property 2: Caller_Class naming correctness
+    // Feature: generated-class-naming, Property 1: InvokerClassSpec naming correctness
     // -------------------------------------------------------------------------
 
     /**
-     * Validates: Requirements 8.3, 9.x
+     * Validates: Requirements 1.1, 2.1, 3.1
      */
     @Property(tries = 100)
     void property2_callerClassNameIsUnchanged(
@@ -88,9 +88,9 @@ class InvokerClassSpecPropertyTest {
                 params, "V", List.of());
         TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
 
-        String expectedName = toPascalCase(name);
+        String expectedName = "Foo" + toPascalCase(name) + "Invoker";
         assertEquals(expectedName, spec.name,
-                "Invoker_Class must be named after the method in PascalCase (unchanged by rename)");
+                "Invoker_Class must be named <EnclosingSimpleName><PascalCaseMethodName>Invoker");
     }
 
     // -------------------------------------------------------------------------
@@ -107,12 +107,11 @@ class InvokerClassSpecPropertyTest {
                 params, "V", List.of());
         TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
 
-        String source = toSource(spec);
-        String expectedName = toPascalCase(name);
+        String expectedName = "Foo" + toPascalCase(name) + "Invoker";
 
         assertTrue(spec.modifiers.contains(Modifier.PUBLIC), "Caller_Class must be public");
         assertTrue(spec.modifiers.contains(Modifier.STATIC), "Caller_Class must be static");
-        assertEquals(expectedName, spec.name, "Caller_Class must be named after the method in PascalCase");
+        assertEquals(expectedName, spec.name, "Caller_Class must be named <EnclosingSimpleName><PascalCaseMethodName>Invoker");
     }
 
     // -------------------------------------------------------------------------
@@ -234,7 +233,7 @@ class InvokerClassSpecPropertyTest {
         TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
 
-        assertEquals("Constructor", spec.name, "Constructor_Caller_Class must be named Constructor");
+        assertEquals("FooConstructor", spec.name, "Constructor_Caller_Class must be named <EnclosingSimpleName>Constructor");
         assertTrue(source.contains("@Generated"), "Constructor_Caller_Class must carry @Generated");
     }
 }

@@ -279,6 +279,7 @@ class ElementValidatorTest {
     void invoker_validMethod_noErrors() {
         // Req 1.3: A valid @Invoker method (non-private, ≥1 param) must produce no errors
         String source = """
+                package testpkg;
                 import rawit.Invoker;
                 public class ValidInvokerMethod {
                     @Invoker
@@ -286,7 +287,7 @@ class ElementValidatorTest {
                 }
                 """;
 
-        List<Diagnostic<? extends JavaFileObject>> diags = compile("ValidInvokerMethod", source);
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("testpkg.ValidInvokerMethod", source);
 
         assertTrue(errors(diags).isEmpty(),
                 "Expected no errors for a valid @Invoker method, got: " + errors(diags));
@@ -300,6 +301,7 @@ class ElementValidatorTest {
     void constructorAnnotation_validConstructor_noErrors() {
         // Req 15.4: A valid @Constructor (non-private, ≥1 param) must produce no errors
         String source = """
+                package testpkg;
                 import rawit.Constructor;
                 public class ValidConstructorAnnotation {
                     @Constructor
@@ -307,7 +309,7 @@ class ElementValidatorTest {
                 }
                 """;
 
-        List<Diagnostic<? extends JavaFileObject>> diags = compile("ValidConstructorAnnotation", source);
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("testpkg.ValidConstructorAnnotation", source);
 
         assertTrue(errors(diags).isEmpty(),
                 "Expected no errors for a valid @Constructor, got: " + errors(diags));
@@ -321,12 +323,13 @@ class ElementValidatorTest {
     void constructorAnnotation_validRecordWithComponents_noErrors() {
         // Req 2.1: @Constructor on a record with ≥1 component must produce no errors
         String source = """
+                package testpkg;
                 import rawit.Constructor;
                 @Constructor
                 public record ValidRecord(int x, int y) {}
                 """;
 
-        List<Diagnostic<? extends JavaFileObject>> diags = compile("ValidRecord", source);
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("testpkg.ValidRecord", source);
 
         assertTrue(errors(diags).isEmpty(),
                 "Expected no errors for a valid @Constructor on a record, got: " + errors(diags));

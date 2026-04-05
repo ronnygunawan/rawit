@@ -65,9 +65,18 @@ class RawitAnnotationProcessorPropertyTest {
                 List.of("-proc:only", "-classpath", buildClasspath(outputDir)));
 
         // Pass 2: compile generated .java files without the processor
-        final File[] generatedJavaFiles = outputDir.toFile().listFiles(
-                f -> f.getName().endsWith(".java") && !f.getName().equals(className + ".java"));
-        if (generatedJavaFiles != null && generatedJavaFiles.length > 0) {
+        // Walk subdirectories because generated files now live in a generated/ subdirectory
+        final String classRelativePath = className.replace('.', File.separatorChar) + ".java";
+        final java.util.List<File> generatedJavaFiles = new java.util.ArrayList<>();
+        try (final var stream = Files.walk(outputDir)) {
+            stream.filter(p -> p.toString().endsWith(".java"))
+                  .filter(p -> {
+                      final String relative = outputDir.relativize(p).toString();
+                      return !relative.equals(classRelativePath);
+                  })
+                  .forEach(p -> generatedJavaFiles.add(p.toFile()));
+        }
+        if (!generatedJavaFiles.isEmpty()) {
             final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
             final DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
             try (final StandardJavaFileManager fm =
@@ -223,11 +232,13 @@ class RawitAnnotationProcessorPropertyTest {
             @ForAll("smallInt") int y
     ) throws Exception {
         // Feature: curry-to-invoker-rename, Property 1: Round-trip equivalence is preserved
-        final String className = "RoundTripAdd_" + Math.abs(x) + "_" + Math.abs(y)
+        final String simpleClassName = "RoundTripAdd_" + Math.abs(x) + "_" + Math.abs(y)
                 + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String className = "testpkg." + simpleClassName;
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Invoker;\n" +
-                "public class " + className + " {\n" +
+                "public class " + simpleClassName + " {\n" +
                 "    @Invoker\n" +
                 "    public int add(int x, int y) { return x + y; }\n" +
                 "}\n";
@@ -270,8 +281,9 @@ class RawitAnnotationProcessorPropertyTest {
             @ForAll("distinctMethodNames") List<String> methodNames
     ) throws Exception {
         // Feature: curry-to-invoker-rename, Property 16: Multiple annotations produce separate Caller_Classes
-        final String className = "MultiInvoker_" + methodNames.size()
+        final String simpleClassName = "MultiInvoker_" + methodNames.size()
                 + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String className = "testpkg." + simpleClassName;
 
         // Build source with one @Invoker method per name, each returning x + y
         final StringBuilder methods = new StringBuilder();
@@ -281,8 +293,9 @@ class RawitAnnotationProcessorPropertyTest {
         }
 
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Invoker;\n" +
-                "public class " + className + " {\n" +
+                "public class " + simpleClassName + " {\n" +
                 methods +
                 "}\n";
 
@@ -292,12 +305,13 @@ class RawitAnnotationProcessorPropertyTest {
             final Object instance = cls.getDeclaredConstructor().newInstance();
 
             // For each method, verify a separate Caller_Class exists and the chain works.
-            // The Caller_Class is generated as a top-level class (not a nested class),
-            // so we load it by its simple PascalCase name directly.
+            // The Caller_Class is generated as a top-level class in the generated subpackage,
+            // named <ClassName><MethodPascalCase>Invoker.
             for (final String name : methodNames) {
-                final String callerClassName = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+                final String pascalMethod = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+                final String callerClassName = "testpkg.generated." + simpleClassName + pascalMethod + "Invoker";
 
-                // The Caller_Class is a top-level class in the default package
+                // The Caller_Class is a top-level class in the generated subpackage
                 final Class<?> callerClass = loader.loadClass(callerClassName);
                 assertNotNull(callerClass,
                         "Caller_Class " + callerClassName + " must exist for method " + name);
@@ -313,7 +327,7 @@ class RawitAnnotationProcessorPropertyTest {
 
             // Verify no name collisions: all Caller_Class names are distinct
             final long distinctCallerNames = methodNames.stream()
-                    .map(n -> Character.toUpperCase(n.charAt(0)) + n.substring(1))
+                    .map(n -> "testpkg.generated." + simpleClassName + Character.toUpperCase(n.charAt(0)) + n.substring(1) + "Invoker")
                     .distinct().count();
             assertEquals(methodNames.size(), distinctCallerNames,
                     "all Caller_Class names must be distinct");
@@ -339,11 +353,13 @@ class RawitAnnotationProcessorPropertyTest {
             @ForAll("smallInt") int y
     ) throws Exception {
         // Feature: curry-to-invoker-rename, Property 18: Invoke idempotency — calling invoke() multiple times produces equal results
-        final String className = "IdempotentAdd_" + Math.abs(x) + "_" + Math.abs(y)
+        final String simpleClassName = "IdempotentAdd_" + Math.abs(x) + "_" + Math.abs(y)
                 + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String className = "testpkg." + simpleClassName;
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Invoker;\n" +
-                "public class " + className + " {\n" +
+                "public class " + simpleClassName + " {\n" +
                 "    @Invoker\n" +
                 "    public int add(int x, int y) { return x + y; }\n" +
                 "}\n";

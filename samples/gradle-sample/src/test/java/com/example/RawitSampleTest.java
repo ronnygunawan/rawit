@@ -1,8 +1,8 @@
 package com.example;
 
-import com.example.constructor.Point;
-import com.example.invoker.Calculator;
-import com.example.record.Coord;
+import com.example.model.Calculator;
+import com.example.model.Coord;
+import com.example.model.Point;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

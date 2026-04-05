@@ -1,4 +1,4 @@
-package com.example.record;
+package com.example.model;
 
 import rawit.Constructor;
 

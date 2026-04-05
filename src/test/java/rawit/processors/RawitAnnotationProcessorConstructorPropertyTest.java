@@ -88,9 +88,18 @@ class RawitAnnotationProcessorConstructorPropertyTest {
                 List.of("-proc:only", "-classpath", buildClasspath(outputDir)));
 
         // Pass 2: compile generated .java files without the processor
-        final File[] generatedJavaFiles = outputDir.toFile().listFiles(
-                f -> f.getName().endsWith(".java") && !f.getName().equals(className + ".java"));
-        if (generatedJavaFiles != null && generatedJavaFiles.length > 0) {
+        // Walk subdirectories because generated files now live in a generated/ subdirectory
+        final String classRelativePath = className.replace('.', File.separatorChar) + ".java";
+        final java.util.List<File> generatedJavaFiles = new java.util.ArrayList<>();
+        try (final var stream = Files.walk(outputDir)) {
+            stream.filter(p -> p.toString().endsWith(".java"))
+                  .filter(p -> {
+                      final String relative = outputDir.relativize(p).toString();
+                      return !relative.equals(classRelativePath);
+                  })
+                  .forEach(p -> generatedJavaFiles.add(p.toFile()));
+        }
+        if (!generatedJavaFiles.isEmpty()) {
             final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
             final DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
             try (final StandardJavaFileManager fm =
@@ -202,6 +211,8 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     /**
      * Builds a source string for a {@code @Constructor}-annotated record with {@code n}
      * int components named c0, c1, ..., c(n-1).
+     * Uses package {@code testpkg} so generated classes in the {@code testpkg.generated}
+     * subpackage can reference the record type.
      */
     private static String buildRecordSource(final String recordName, final int componentCount) {
         final StringBuilder components = new StringBuilder();
@@ -209,7 +220,8 @@ class RawitAnnotationProcessorConstructorPropertyTest {
             if (i > 0) components.append(", ");
             components.append("int c").append(i);
         }
-        return "import rawit.Constructor;\n" +
+        return "package testpkg;\n" +
+               "import rawit.Constructor;\n" +
                "@Constructor\n" +
                "public record " + recordName + "(" + components + ") {}\n";
     }
@@ -217,6 +229,8 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     /**
      * Builds a source string for a class with a @Constructor-annotated constructor
      * that takes {@code n} int parameters named p0, p1, ..., p(n-1).
+     * Uses package {@code testpkg} so generated classes in the {@code testpkg.generated}
+     * subpackage can reference the class type.
      */
     private static String buildConstructorSource(final String className, final int paramCount) {
         final StringBuilder fields = new StringBuilder();
@@ -231,7 +245,8 @@ class RawitAnnotationProcessorConstructorPropertyTest {
             assignments.append("        this.").append(pName).append(" = ").append(pName).append(";\n");
         }
 
-        return "import rawit.Constructor;\n" +
+        return "package testpkg;\n" +
+               "import rawit.Constructor;\n" +
                "public class " + className + " {\n" +
                fields +
                "    @Constructor\n" +
@@ -258,11 +273,12 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     ) throws Exception {
         // Feature: curry-to-invoker-rename, Property 25: constructor() entry point is public static
         final String className = "CtorEntry_" + n + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String qualifiedName = "testpkg." + className;
         final String source = buildConstructorSource(className, n);
 
         final Path outputDir = Files.createTempDirectory("prop25_");
-        try (final URLClassLoader loader = compileAndLoad(className, source, outputDir)) {
-            final Class<?> cls = loader.loadClass(className);
+        try (final URLClassLoader loader = compileAndLoad(qualifiedName, source, outputDir)) {
+            final Class<?> cls = loader.loadClass(qualifiedName);
 
             // Find the "constructor" method with zero parameters
             Method constructorMethod = null;
@@ -302,17 +318,20 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     ) throws Exception {
         // Feature: curry-to-invoker-rename, Property 26: Constructor_Caller_Class is injected as a public static inner class named Constructor
         final String className = "CtorCaller_" + n + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String qualifiedName = "testpkg." + className;
         final String source = buildConstructorSource(className, n);
 
         final Path outputDir = Files.createTempDirectory("prop26_");
-        try (final URLClassLoader loader = compileAndLoad(className, source, outputDir)) {
-            // The Constructor_Caller_Class is generated as a top-level class named "Constructor"
-            final Class<?> constructorClass = loader.loadClass("Constructor");
+        try (final URLClassLoader loader = compileAndLoad(qualifiedName, source, outputDir)) {
+            // The Constructor_Caller_Class is generated as a top-level class in the generated subpackage
+            // named <ClassName>Constructor (e.g., testpkg.generated.CtorCaller_2_abcConstructor)
+            final String constructorClassName = "testpkg.generated." + className + "Constructor";
+            final Class<?> constructorClass = loader.loadClass(constructorClassName);
 
             assertNotNull(constructorClass,
-                    "A top-level class named 'Constructor' must be loadable after processing");
+                    "A top-level class named '" + constructorClassName + "' must be loadable after processing");
             assertTrue(Modifier.isPublic(constructorClass.getModifiers()),
-                    "The 'Constructor' class must be public");
+                    "The '" + constructorClassName + "' class must be public");
         } finally {
             deleteRecursively(outputDir);
         }
@@ -336,11 +355,12 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     ) throws Exception {
         // Feature: curry-to-invoker-rename, Property 27: ConstructStageInvoker has a construct() method returning the enclosing type
         final String className = "CtorConstruct_" + n + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String qualifiedName = "testpkg." + className;
         final String source = buildConstructorSource(className, n);
 
         final Path outputDir = Files.createTempDirectory("prop27_");
-        try (final URLClassLoader loader = compileAndLoad(className, source, outputDir)) {
-            final Class<?> cls = loader.loadClass(className);
+        try (final URLClassLoader loader = compileAndLoad(qualifiedName, source, outputDir)) {
+            final Class<?> cls = loader.loadClass(qualifiedName);
 
             // Walk the chain: constructor().p0(0).p1(0)...pN-1(0).construct()
             // Start: call the static constructor() entry point
@@ -439,11 +459,12 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     ) throws Exception {
         // Feature: record-constructor-support, Property 1: Record AnnotatedMethod construction correctness
         final String recordName = "RecProp1_" + n + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String qualifiedName = "testpkg." + recordName;
         final String source = buildRecordSource(recordName, n);
 
         final Path outputDir = Files.createTempDirectory("prop1_rec_");
-        try (final URLClassLoader loader = compileAndLoad(recordName, source, outputDir)) {
-            final Class<?> recordClass = loader.loadClass(recordName);
+        try (final URLClassLoader loader = compileAndLoad(qualifiedName, source, outputDir)) {
+            final Class<?> recordClass = loader.loadClass(qualifiedName);
 
             // 1. Verify constructor() entry point exists (proves enclosingClassName is correct
             //    and isConstructorAnnotation=true — the processor only generates constructor()
@@ -529,14 +550,16 @@ class RawitAnnotationProcessorConstructorPropertyTest {
         // Feature: record-constructor-support, Property 5: Type descriptor correctness for record components
         final String recordName = "RecProp5_" + compType.javaSource().replaceAll("[^a-zA-Z0-9]", "")
                 + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String qualifiedName = "testpkg." + recordName;
 
-        final String source = "import rawit.Constructor;\n" +
+        final String source = "package testpkg;\n" +
+                "import rawit.Constructor;\n" +
                 "@Constructor\n" +
                 "public record " + recordName + "(" + compType.javaSource() + " value) {}\n";
 
         final Path outputDir = Files.createTempDirectory("prop5_rec_");
-        try (final URLClassLoader loader = compileAndLoad(recordName, source, outputDir)) {
-            final Class<?> recordClass = loader.loadClass(recordName);
+        try (final URLClassLoader loader = compileAndLoad(qualifiedName, source, outputDir)) {
+            final Class<?> recordClass = loader.loadClass(qualifiedName);
 
             // Call the constructor() entry point
             final Method entryPoint = recordClass.getMethod("constructor");
@@ -738,16 +761,17 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     ) throws Exception {
         // Feature: record-constructor-support, Property 6: Code generation produces correct staged API for records
         final String recordName = "RecProp6_" + n + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String qualifiedName = "testpkg." + recordName;
         final String source = buildRecordSource(recordName, n);
 
         final Path outputDir = Files.createTempDirectory("prop6_rec_");
-        try (final URLClassLoader loader = compileAndLoad(recordName, source, outputDir)) {
-            final Class<?> recordClass = loader.loadClass(recordName);
+        try (final URLClassLoader loader = compileAndLoad(qualifiedName, source, outputDir)) {
+            final Class<?> recordClass = loader.loadClass(qualifiedName);
 
             // 1. Verify the Constructor caller class exists
-            final Class<?> constructorClass = loader.loadClass("Constructor");
+            final Class<?> constructorClass = loader.loadClass("testpkg.generated." + recordName + "Constructor");
             assertNotNull(constructorClass,
-                    "A top-level 'Constructor' caller class must be generated for record " + recordName);
+                    "A top-level '" + recordName + "Constructor' caller class must be generated for record " + recordName);
             assertTrue(Modifier.isPublic(constructorClass.getModifiers()),
                     "Constructor caller class must be public");
 
@@ -813,14 +837,15 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     ) throws Exception {
         // Feature: record-constructor-support, Property 11: Pipeline integration for record-derived AnnotatedMethod
         final String recordName = "RecProp11_" + n + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String qualifiedName = "testpkg." + recordName;
         final String source = buildRecordSource(recordName, n);
 
         final Path outputDir = Files.createTempDirectory("prop11_rec_");
-        try (final URLClassLoader loader = compileAndLoad(recordName, source, outputDir)) {
-            final Class<?> recordClass = loader.loadClass(recordName);
+        try (final URLClassLoader loader = compileAndLoad(qualifiedName, source, outputDir)) {
+            final Class<?> recordClass = loader.loadClass(qualifiedName);
 
             // 1. Verify the Constructor caller class was generated (proves InvokerClassSpec.build() succeeded)
-            final Class<?> constructorClass = loader.loadClass("Constructor");
+            final Class<?> constructorClass = loader.loadClass("testpkg.generated." + recordName + "Constructor");
             assertNotNull(constructorClass,
                     "Constructor caller class must be generated (proves pipeline integration)");
 
@@ -876,11 +901,12 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     ) throws Exception {
         // Feature: record-constructor-support, Property 9: Backward compatibility for regular class constructors
         final String className = "RegProp9_" + n + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String qualifiedName = "testpkg." + className;
         final String source = buildConstructorSource(className, n);
 
         final Path outputDir = Files.createTempDirectory("prop9_reg_");
-        try (final URLClassLoader loader = compileAndLoad(className, source, outputDir)) {
-            final Class<?> cls = loader.loadClass(className);
+        try (final URLClassLoader loader = compileAndLoad(qualifiedName, source, outputDir)) {
+            final Class<?> cls = loader.loadClass(qualifiedName);
 
             // 1. Verify constructor() entry point exists (backward compatible behavior)
             final Method entryPoint = cls.getMethod("constructor");

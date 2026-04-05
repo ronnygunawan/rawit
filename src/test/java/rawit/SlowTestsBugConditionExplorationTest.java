@@ -91,14 +91,14 @@ class SlowTestsBugConditionExplorationTest {
     /**
      * Validates: Requirements 2.2
      *
-     * <p>Asserts that all 7 property methods in {@code BytecodeInjectorPropertyTest}
+     * <p>Asserts that all 8 property methods in {@code BytecodeInjectorPropertyTest}
      * have {@code tries = 5}. FAILS on unfixed code (currently tries=100).
      */
     @Test
     void bytecodeInjectorPropertyTest_allPropertiesHaveTries5() {
         assertTriesAndCount(
                 loadClass("rawit.processors.inject.BytecodeInjectorPropertyTest"),
-                EXPECTED_TRIES, 7);
+                EXPECTED_TRIES, 8);
     }
 
     /**

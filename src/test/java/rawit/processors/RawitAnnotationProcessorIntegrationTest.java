@@ -63,9 +63,18 @@ class RawitAnnotationProcessorIntegrationTest {
                 List.of("-proc:only", "-classpath", buildClasspath(outputDir)));
 
         // Step 2: Compile the generated .java files without the processor
-        final java.io.File[] generatedJavaFiles = outputDir.toFile().listFiles(
-                f -> f.getName().endsWith(".java") && !f.getName().equals(className + ".java"));
-        if (generatedJavaFiles != null && generatedJavaFiles.length > 0) {
+        // Walk subdirectories because generated files now live in a generated/ subdirectory
+        final String classRelativePath = className.replace('.', java.io.File.separatorChar) + ".java";
+        final java.util.List<java.io.File> generatedJavaFiles = new java.util.ArrayList<>();
+        try (final var stream = java.nio.file.Files.walk(outputDir)) {
+            stream.filter(p -> p.toString().endsWith(".java"))
+                  .filter(p -> {
+                      final String relative = outputDir.relativize(p).toString();
+                      return !relative.equals(classRelativePath);
+                  })
+                  .forEach(p -> generatedJavaFiles.add(p.toFile()));
+        }
+        if (!generatedJavaFiles.isEmpty()) {
             final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
             final DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
             try (final StandardJavaFileManager fm =
@@ -365,14 +374,15 @@ class RawitAnnotationProcessorIntegrationTest {
     void instanceMethod_invokerChain_equalsDirectInvocation(@TempDir final Path outputDir)
             throws Exception {
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Invoker;\n" +
                 "public class AddInstance {\n" +
                 "    @Invoker\n" +
                 "    public int add(int x, int y) { return x + y; }\n" +
                 "}\n";
 
-        try (final URLClassLoader loader = compileAndLoad("AddInstance", source, outputDir)) {
-            final Class<?> fooClass = loader.loadClass("AddInstance");
+        try (final URLClassLoader loader = compileAndLoad("testpkg.AddInstance", source, outputDir)) {
+            final Class<?> fooClass = loader.loadClass("testpkg.AddInstance");
             final Object foo = fooClass.getDeclaredConstructor().newInstance();
 
             // foo.add().x(3).y(4).invoke() should equal foo.add(3, 4) == 7
@@ -399,14 +409,15 @@ class RawitAnnotationProcessorIntegrationTest {
     void staticMethod_invokerChain_equalsDirectInvocation(@TempDir final Path outputDir)
             throws Exception {
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Invoker;\n" +
                 "public class AddStatic {\n" +
                 "    @Invoker\n" +
                 "    public static int add(int x, int y) { return x + y; }\n" +
                 "}\n";
 
-        try (final URLClassLoader loader = compileAndLoad("AddStatic", source, outputDir)) {
-            final Class<?> fooClass = loader.loadClass("AddStatic");
+        try (final URLClassLoader loader = compileAndLoad("testpkg.AddStatic", source, outputDir)) {
+            final Class<?> fooClass = loader.loadClass("testpkg.AddStatic");
 
             // AddStatic.add().x(3).y(4).invoke() should equal AddStatic.add(3, 4) == 7
             final Object addStage = fooClass.getMethod("add").invoke(null);
@@ -431,6 +442,7 @@ class RawitAnnotationProcessorIntegrationTest {
     void constructorWithInvoker_invokerChain_equalsDirectInvocation(@TempDir final Path outputDir)
             throws Exception {
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Invoker;\n" +
                 "public class PointCurry {\n" +
                 "    public final int x;\n" +
@@ -439,8 +451,8 @@ class RawitAnnotationProcessorIntegrationTest {
                 "    public PointCurry(int x, int y) { this.x = x; this.y = y; }\n" +
                 "}\n";
 
-        try (final URLClassLoader loader = compileAndLoad("PointCurry", source, outputDir)) {
-            final Class<?> pointClass = loader.loadClass("PointCurry");
+        try (final URLClassLoader loader = compileAndLoad("testpkg.PointCurry", source, outputDir)) {
+            final Class<?> pointClass = loader.loadClass("testpkg.PointCurry");
 
             // PointCurry.pointcurry().x(1).y(2).invoke() should produce a PointCurry with x=1, y=2
             final Object xStage = pointClass.getMethod("pointcurry").invoke(null);
@@ -471,6 +483,7 @@ class RawitAnnotationProcessorIntegrationTest {
     void constructorAnnotation_constructChain_createsInstance(@TempDir final Path outputDir)
             throws Exception {
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Constructor;\n" +
                 "public class Person {\n" +
                 "    public final int id;\n" +
@@ -479,8 +492,8 @@ class RawitAnnotationProcessorIntegrationTest {
                 "    public Person(int id, String name) { this.id = id; this.name = name; }\n" +
                 "}\n";
 
-        try (final URLClassLoader loader = compileAndLoad("Person", source, outputDir)) {
-            final Class<?> personClass = loader.loadClass("Person");
+        try (final URLClassLoader loader = compileAndLoad("testpkg.Person", source, outputDir)) {
+            final Class<?> personClass = loader.loadClass("testpkg.Person");
 
             // Person.constructor().id(1).name("bar").construct() should create Person(1, "bar")
             final Object idStage = personClass.getMethod("constructor").invoke(null);
@@ -512,6 +525,7 @@ class RawitAnnotationProcessorIntegrationTest {
     void overloadGroupWithBranching_bothBranchesWork(@TempDir final Path outputDir)
             throws Exception {
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Invoker;\n" +
                 "public class Calculator {\n" +
                 "    @Invoker\n" +
@@ -520,8 +534,8 @@ class RawitAnnotationProcessorIntegrationTest {
                 "    public int compute(int x, String label) { return x + label.length(); }\n" +
                 "}\n";
 
-        try (final URLClassLoader loader = compileAndLoad("Calculator", source, outputDir)) {
-            final Class<?> calcClass = loader.loadClass("Calculator");
+        try (final URLClassLoader loader = compileAndLoad("testpkg.Calculator", source, outputDir)) {
+            final Class<?> calcClass = loader.loadClass("testpkg.Calculator");
             final Object calc = calcClass.getDeclaredConstructor().newInstance();
 
             // Branch 1: compute().x(5).y(3).invoke() == 8
@@ -549,6 +563,7 @@ class RawitAnnotationProcessorIntegrationTest {
     @Test
     void prefixOverload_bothInvokePathsWork(@TempDir final Path outputDir) throws Exception {
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Invoker;\n" +
                 "public class Adder {\n" +
                 "    @Invoker\n" +
@@ -557,8 +572,8 @@ class RawitAnnotationProcessorIntegrationTest {
                 "    public int bar(int x, int y, int z) { return x + y + z; }\n" +
                 "}\n";
 
-        try (final URLClassLoader loader = compileAndLoad("Adder", source, outputDir)) {
-            final Class<?> adderClass = loader.loadClass("Adder");
+        try (final URLClassLoader loader = compileAndLoad("testpkg.Adder", source, outputDir)) {
+            final Class<?> adderClass = loader.loadClass("testpkg.Adder");
             final Object adder = adderClass.getDeclaredConstructor().newInstance();
 
             // Short path: bar().x(10).y(20).invoke() == 30
@@ -589,12 +604,13 @@ class RawitAnnotationProcessorIntegrationTest {
     void recordConstructor_stagedApi_createsRecordInstance(@TempDir final Path outputDir)
             throws Exception {
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Constructor;\n" +
                 "@Constructor\n" +
                 "public record Point(int x, int y) {}\n";
 
-        try (final URLClassLoader loader = compileAndLoad("Point", source, outputDir)) {
-            final Class<?> pointClass = loader.loadClass("Point");
+        try (final URLClassLoader loader = compileAndLoad("testpkg.Point", source, outputDir)) {
+            final Class<?> pointClass = loader.loadClass("testpkg.Point");
 
             // Point.constructor().x(1).y(2).construct() should create Point(1, 2)
             final Object xStage = pointClass.getMethod("constructor").invoke(null);
@@ -628,12 +644,13 @@ class RawitAnnotationProcessorIntegrationTest {
     void recordConstructor_mixedTypes_stagedApiWorksCorrectly(@TempDir final Path outputDir)
             throws Exception {
         final String source =
+                "package testpkg;\n" +
                 "import rawit.Constructor;\n" +
                 "@Constructor\n" +
                 "public record Config(String name, int port, boolean secure) {}\n";
 
-        try (final URLClassLoader loader = compileAndLoad("Config", source, outputDir)) {
-            final Class<?> configClass = loader.loadClass("Config");
+        try (final URLClassLoader loader = compileAndLoad("testpkg.Config", source, outputDir)) {
+            final Class<?> configClass = loader.loadClass("testpkg.Config");
 
             // Config.constructor().name("server").port(8080).secure(true).construct()
             final Object nameStage = configClass.getMethod("constructor").invoke(null);
