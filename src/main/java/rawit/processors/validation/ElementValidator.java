@@ -8,7 +8,6 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
 import javax.tools.Diagnostic;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Validates elements annotated with {@code @Invoker} or {@code @Constructor}.
@@ -188,8 +187,8 @@ public class ElementValidator {
                 hasError = true;
             }
 
-            // Requirement 2.4 — no existing zero-param static method named "constructor"
-            if (typeHasZeroParamStaticMethod(typeElement, "constructor")) {
+            // Requirement 2.4 — no existing zero-param method named "constructor" (static or instance)
+            if (typeHasZeroParamMethod(typeElement, "constructor")) {
                 messager.printMessage(
                         Diagnostic.Kind.ERROR,
                         "a parameterless overload named 'constructor' already exists",
@@ -255,19 +254,20 @@ public class ElementValidator {
 
     /**
      * Scans the enclosed elements of the given {@link TypeElement} for a zero-parameter
-     * static method with the given name. Used for record-type conflict detection where
-     * the type element IS the enclosing element (unlike the constructor case).
+     * method with the given name (static or instance). Used for record-type conflict
+     * detection where the type element IS the enclosing element (unlike the constructor
+     * case). Checks both static and instance methods because bytecode injection will
+     * conflict with either.
      */
-    private boolean typeHasZeroParamStaticMethod(final TypeElement typeElement,
-                                                  final String methodName) {
+    private boolean typeHasZeroParamMethod(final TypeElement typeElement,
+                                            final String methodName) {
         for (final Element enclosed : typeElement.getEnclosedElements()) {
             if (enclosed.getKind() != ElementKind.METHOD) {
                 continue;
             }
             final ExecutableElement candidate = (ExecutableElement) enclosed;
             if (candidate.getSimpleName().contentEquals(methodName)
-                    && candidate.getParameters().isEmpty()
-                    && candidate.getModifiers().contains(Modifier.STATIC)) {
+                    && candidate.getParameters().isEmpty()) {
                 return true;
             }
         }

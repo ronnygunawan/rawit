@@ -85,7 +85,7 @@ Extend the Rawit annotation processor to support `@Constructor` on Java record t
 - [x] 5. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 6. Add integration tests for record-type end-to-end processing
+- [x] 6. Add integration tests for record-type end-to-end processing
   - [x] 6.1 Add integration test: `@Constructor` on a record produces working staged API
     - Add test to `src/test/java/rawit/processors/RawitAnnotationProcessorIntegrationTest.java`
     - Compile `@Constructor public record Point(int x, int y) {}` through the three-pass pipeline
@@ -131,7 +131,7 @@ Extend the Rawit annotation processor to support `@Constructor` on Java record t
 - [x] 7. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 8. Add bytecode injection tests for records
+- [x] 8. Add bytecode injection tests for records
   - [x] 8.1 Write property test: Bytecode injection produces correct entry point for records
     - **Property 7: Bytecode injection produces correct entry point for records**
     - For any record whose `.class` file does not already contain a zero-parameter method named `constructor`, the `BytecodeInjector` SHALL inject a `public static constructor()` method whose bytecode instantiates and returns the generated `Constructor` caller class

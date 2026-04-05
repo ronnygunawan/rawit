@@ -1,6 +1,10 @@
-package com.example.rawit;
+package com.example;
 
+import com.example.constructor.Point;
+import com.example.invoker.Calculator;
+import com.example.record.Coord;
 import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class RawitSampleTest {
@@ -27,8 +31,8 @@ class RawitSampleTest {
 
     @Test
     void recordConstructor() {
-        Coord c = Coord.constructor().x(1).y(2).construct();
-        assertEquals(1, c.x());
-        assertEquals(2, c.y());
+        Coord c = Coord.constructor().lat(1).lon(2).construct();
+        assertEquals(1, c.lat());
+        assertEquals(2, c.lon());
     }
 }
