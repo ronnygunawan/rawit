@@ -326,9 +326,9 @@ class BytecodeInjectorPropertyTest {
 
             assertTrue(errors.isEmpty(), "no errors expected: " + errors);
 
-            // Expected return descriptor: Lgenerated/<ClassName><PascalMethod>Invoker;
-            // The return type is the caller class in the generated/ subpackage
-            final String expectedReturnDescriptor = "Lgenerated/" + className + toPascalCase(methodName) + "Invoker;";
+            // Expected return descriptor: L<ClassName><PascalMethod>Invoker;
+            // Default-package classes stay in the default package (no generated/ prefix)
+            final String expectedReturnDescriptor = "L" + className + toPascalCase(methodName) + "Invoker;";
             final String expectedMethodDescriptor = "()" + expectedReturnDescriptor;
 
             final String actualDescriptor = zeroParamMethodDescriptor(classFile, methodName);
@@ -470,9 +470,9 @@ class BytecodeInjectorPropertyTest {
             assertTrue((access & Opcodes.ACC_PUBLIC) != 0, "constructor() must be public");
             assertTrue((access & Opcodes.ACC_STATIC) != 0, "constructor() must be static");
 
-            // Verify return type is the <RecordName>Constructor caller class in the generated/ subpackage
-            assertEquals("()Lgenerated/" + recordName + "Constructor;", descriptor,
-                    "constructor() must return the <RecordName>Constructor caller class in generated/ subpackage");
+            // Verify return type is the <RecordName>Constructor caller class (default package, no generated/ prefix)
+            assertEquals("()L" + recordName + "Constructor;", descriptor,
+                    "constructor() must return the <RecordName>Constructor caller class");
         } finally {
             deleteDir(tempDir);
         }
@@ -624,7 +624,7 @@ class BytecodeInjectorPropertyTest {
             final AnnotatedMethod method;
             final String expectedOverloadName;
             final String expectedBinaryName;
-            final String pkgPrefix = pkg.isEmpty() ? "generated/" : binaryEnclosing.substring(0, binaryEnclosing.lastIndexOf('/') + 1) + "generated/";
+            final String pkgPrefix = pkg.isEmpty() ? "" : binaryEnclosing.substring(0, binaryEnclosing.lastIndexOf('/') + 1) + "generated/";
 
             switch (annotationKind) {
                 case "invokerMethod" -> {
@@ -665,14 +665,15 @@ class BytecodeInjectorPropertyTest {
 
             final String expectedDescriptor = "()L" + expectedBinaryName + ";";
             assertEquals(expectedDescriptor, descriptor,
-                    "return type descriptor must reference the caller class in the generated/ subpackage"
+                    "return type descriptor must reference the caller class"
                             + " (annotationKind=" + annotationKind + ", pkg=" + (pkg.isEmpty() ? "<default>" : pkg) + ")");
 
-            // Also verify the generated/ segment is always present in the binary name
-            // For default package: "Lgenerated/..." (no leading /)
-            // For packaged classes: "L<pkg>/generated/..." (has leading /)
-            assertTrue(descriptor.contains("generated/"),
-                    "binary name must contain 'generated/' segment");
+            // For packaged classes, verify the generated/ segment is present in the binary name
+            // For default package, generated code stays in the default package (no generated/ prefix)
+            if (!pkg.isEmpty()) {
+                assertTrue(descriptor.contains("generated/"),
+                        "binary name must contain 'generated/' segment for packaged classes");
+            }
         } finally {
             deleteDir(tempDir);
         }

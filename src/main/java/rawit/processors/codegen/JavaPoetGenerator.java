@@ -98,6 +98,6 @@ public class JavaPoetGenerator {
         final String dotName = binaryName.replace('/', '.');
         final int lastDot = dotName.lastIndexOf('.');
         final String pkg = lastDot < 0 ? "" : dotName.substring(0, lastDot);
-        return pkg.isEmpty() ? "generated" : pkg + ".generated";
+        return pkg.isEmpty() ? "" : pkg + ".generated";
     }
 }

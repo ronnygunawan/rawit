@@ -278,8 +278,8 @@ class BytecodeInjectorTest {
 
         final String descriptor = zeroParamMethodDescriptor(classFile, "bar");
         assertNotNull(descriptor, "parameterless bar() must exist");
-        // The return type is the caller class in the generated/ subpackage: FooReturnTypeBarInvoker
-        assertEquals("()Lgenerated/FooReturnTypeBarInvoker;", descriptor,
-                "return type must be the caller class in the generated/ subpackage");
+        // The return type is the caller class (default package, no generated/ prefix)
+        assertEquals("()LFooReturnTypeBarInvoker;", descriptor,
+                "return type must be the caller class");
     }
 }

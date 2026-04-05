@@ -302,13 +302,14 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     }
 
     // =========================================================================
-    // Property 26: Constructor_Caller_Class is injected as a public static inner class named Constructor
-    // Feature: curry-to-invoker-rename, Property 26: Constructor_Caller_Class is injected as a public static inner class named Constructor
+    // Property 26: Constructor_Caller_Class is a public top-level class named <EnclosingSimpleName>Constructor
+    // Feature: generated-class-naming, Property 26: Constructor_Caller_Class is a public top-level class
     // =========================================================================
 
     /**
-     * For any class with @Constructor on a constructor, after processing, a class named
-     * "Constructor" should be loadable from the output directory and be public.
+     * For any class with @Constructor on a constructor, after processing, a top-level class
+     * named "&lt;ClassName&gt;Constructor" should be loadable from the generated subpackage
+     * and be public.
      *
      * Validates: Requirements 17.1
      */
@@ -316,7 +317,7 @@ class RawitAnnotationProcessorConstructorPropertyTest {
     void property26_constructorCallerClassIsPublic(
             @ForAll("paramCount") int n
     ) throws Exception {
-        // Feature: curry-to-invoker-rename, Property 26: Constructor_Caller_Class is injected as a public static inner class named Constructor
+        // Feature: generated-class-naming, Property 26: Constructor_Caller_Class is a public top-level class named <EnclosingSimpleName>Constructor
         final String className = "CtorCaller_" + n + "_" + Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
         final String qualifiedName = "testpkg." + className;
         final String source = buildConstructorSource(className, n);

@@ -275,7 +275,7 @@ public class BytecodeInjector {
 
         private static String packagePrefix(final String binaryClassName) {
             final int lastSlash = binaryClassName.lastIndexOf('/');
-            if (lastSlash < 0) return "generated/";
+            if (lastSlash < 0) return "";
             return binaryClassName.substring(0, lastSlash + 1) + "generated/";
         }
 

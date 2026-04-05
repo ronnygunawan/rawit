@@ -83,17 +83,17 @@ class JavaPoetGeneratorPropertyTest {
 
     /**
      * For any default-package binary class name (no '/'), resolvePackageName()
-     * must return exactly "generated".
+     * must return exactly "" (empty string — stay in the default package).
      *
      * <p>Validates: Requirements 4.1, 4.3
      */
     @Property(tries = 100)
-    void property3_defaultPackageProducesGenerated(
+    void property3_defaultPackageProducesEmptyString(
             @ForAll("defaultPackageBinaryName") String binaryName
     ) {
         String result = JavaPoetGenerator.resolvePackageName(binaryName);
 
-        assertEquals("generated", result,
-                "default package must produce 'generated' but was: " + result);
+        assertEquals("", result,
+                "default package must produce '' but was: " + result);
     }
 }

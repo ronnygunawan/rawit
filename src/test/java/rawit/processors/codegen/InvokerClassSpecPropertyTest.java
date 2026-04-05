@@ -72,7 +72,7 @@ class InvokerClassSpecPropertyTest {
     }
 
     // -------------------------------------------------------------------------
-    // Property 2: Caller_Class naming correctness
+    // Property 1: Caller_Class naming correctness
     // Feature: generated-class-naming, Property 1: InvokerClassSpec naming correctness
     // -------------------------------------------------------------------------
 
