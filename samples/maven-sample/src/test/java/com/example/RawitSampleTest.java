@@ -1,6 +1,10 @@
-package com.example.rawit;
+package com.example;
 
+import com.example.constructor.Point;
+import com.example.invoker.Calculator;
+import com.example.record.Coord;
 import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class RawitSampleTest {

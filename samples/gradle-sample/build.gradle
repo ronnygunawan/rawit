@@ -40,10 +40,6 @@ task reinjectBytecode(type: JavaCompile) {
 
 classes.dependsOn reinjectBytecode
 
-compileTestJava {
-    options.incremental = false
-}
-
 test {
     useJUnitPlatform()
 }
