@@ -98,7 +98,7 @@ class JavaPoetGeneratorTest {
             @Override public Filer getFiler() { return mockFiler; }
             @Override public Elements getElementUtils() { return null; }
             @Override public Types getTypeUtils() { return null; }
-            @Override public SourceVersion getSourceVersion() { return SourceVersion.RELEASE_21; }
+            @Override public SourceVersion getSourceVersion() { return SourceVersion.latestSupported(); }
             @Override public Locale getLocale() { return Locale.getDefault(); }
         };
     }
@@ -204,7 +204,7 @@ class JavaPoetGeneratorTest {
             @Override public Filer getFiler() { return idempotentFiler; }
             @Override public Elements getElementUtils() { return null; }
             @Override public Types getTypeUtils() { return null; }
-            @Override public SourceVersion getSourceVersion() { return SourceVersion.RELEASE_21; }
+            @Override public SourceVersion getSourceVersion() { return SourceVersion.latestSupported(); }
             @Override public Locale getLocale() { return Locale.getDefault(); }
         };
 
