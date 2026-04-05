@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Property-based tests for {@link ElementValidator} validation rules.
@@ -387,5 +388,160 @@ class ElementValidatorPropertyTest {
         assertEquals(1, errorCount,
                 "Expected exactly 1 error for private @Constructor with %d params, got %d. Diagnostics: %s"
                 .formatted(paramTypes.size(), errorCount, diags));
+    }
+
+    // -------------------------------------------------------------------------
+    // Property 2: Validation accepts valid records
+    // -------------------------------------------------------------------------
+
+    @Property(tries = 5)
+    void property2_validRecordWithComponents_producesNoErrors(
+            @ForAll("recordComponentLists") List<String> componentTypes) {
+        // Feature: record-constructor-support, Property 2: Validation accepts valid records
+        // Validates: Requirements 2.1
+
+        String className = uniqueClassName("ValidRecord");
+        String components = buildRecordComponents(componentTypes);
+
+        String source = """
+                import rawit.Constructor;
+                @Constructor
+                public record %s(%s) {}
+                """.formatted(className, components);
+
+        List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
+
+        long errorCount = countErrors(diags);
+        assertEquals(0, errorCount,
+                "Expected 0 errors for valid @Constructor on record with %d components, got %d. Diagnostics: %s"
+                .formatted(componentTypes.size(), errorCount, diags));
+    }
+
+    // -------------------------------------------------------------------------
+    // Property 3: Validation rejects non-record types
+    // -------------------------------------------------------------------------
+
+    @Property(tries = 5)
+    void property3_nonRecordType_emitsError(
+            @ForAll("nonRecordTypeKinds") String typeKind) {
+        // Feature: record-constructor-support, Property 3: Validation rejects non-record types
+        // Validates: Requirements 2.3
+
+        String className = uniqueClassName("NonRecord");
+
+        String source = switch (typeKind) {
+            case "class" -> """
+                    import rawit.Constructor;
+                    @Constructor
+                    public class %s {
+                        private final int x;
+                        public %s(int x) { this.x = x; }
+                    }
+                    """.formatted(className, className);
+            case "interface" -> """
+                    import rawit.Constructor;
+                    @Constructor
+                    public interface %s {}
+                    """.formatted(className);
+            case "enum" -> """
+                    import rawit.Constructor;
+                    @Constructor
+                    public enum %s { A, B }
+                    """.formatted(className);
+            default -> throw new IllegalArgumentException("Unknown type kind: " + typeKind);
+        };
+
+        List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
+
+        long errorCount = countErrors(diags);
+        assertTrue(errorCount >= 1,
+                "Expected at least 1 error for @Constructor on %s, got %d. Diagnostics: %s"
+                .formatted(typeKind, errorCount, diags));
+        assertTrue(diags.stream()
+                        .filter(d -> d.getKind() == Diagnostic.Kind.ERROR)
+                        .anyMatch(d -> d.getMessage(Locale.ROOT).contains("only supported for records")),
+                "Expected error message mentioning 'only supported for records' for @Constructor on %s. Diagnostics: %s"
+                .formatted(typeKind, diags));
+    }
+
+    // -------------------------------------------------------------------------
+    // Property 4: Validation detects constructor() conflict on records
+    // -------------------------------------------------------------------------
+
+    @Property(tries = 5)
+    void property4_recordWithExistingConstructorMethod_emitsConflictError(
+            @ForAll("recordComponentLists") List<String> componentTypes) {
+        // Feature: record-constructor-support, Property 4: Validation detects constructor() conflict on records
+        // Validates: Requirements 2.4
+
+        String className = uniqueClassName("ConflictRecord");
+        String components = buildRecordComponents(componentTypes);
+
+        String source = """
+                import rawit.Constructor;
+                @Constructor
+                public record %s(%s) {
+                    public static %s constructor() {
+                        return new %s(%s);
+                    }
+                }
+                """.formatted(className, components, className, className, buildDefaultValues(componentTypes));
+
+        List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
+
+        long errorCount = countErrors(diags);
+        assertTrue(errorCount >= 1,
+                "Expected at least 1 error for @Constructor on record with existing constructor() method, got %d. Diagnostics: %s"
+                .formatted(errorCount, diags));
+        assertTrue(diags.stream()
+                        .filter(d -> d.getKind() == Diagnostic.Kind.ERROR)
+                        .anyMatch(d -> d.getMessage(Locale.ROOT).contains("already exists")),
+                "Expected error message mentioning 'already exists' for constructor() conflict. Diagnostics: %s"
+                .formatted(diags));
+    }
+
+    // -------------------------------------------------------------------------
+    // Record-specific arbitraries and helpers
+    // -------------------------------------------------------------------------
+
+    @Provide
+    Arbitrary<List<String>> recordComponentLists() {
+        // 1 to 5 components, each chosen from PARAM_TYPES
+        return Arbitraries.of(PARAM_TYPES)
+                .list()
+                .ofMinSize(1)
+                .ofMaxSize(5);
+    }
+
+    @Provide
+    Arbitrary<String> nonRecordTypeKinds() {
+        return Arbitraries.of("class", "interface", "enum");
+    }
+
+    /** Builds a record component list like "int c0, String c1, long c2". */
+    private String buildRecordComponents(List<String> types) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < types.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(types.get(i)).append(" c").append(i);
+        }
+        return sb.toString();
+    }
+
+    /** Builds default values for a constructor call, e.g. "0, \"\", 0L, false, 0.0". */
+    private String buildDefaultValues(List<String> types) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < types.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(switch (types.get(i)) {
+                case "int" -> "0";
+                case "long" -> "0L";
+                case "boolean" -> "false";
+                case "double" -> "0.0";
+                case "String" -> "\"\"";
+                default -> "null";
+            });
+        }
+        return sb.toString();
     }
 }

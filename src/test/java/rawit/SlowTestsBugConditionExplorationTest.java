@@ -78,27 +78,27 @@ class SlowTestsBugConditionExplorationTest {
     /**
      * Validates: Requirements 2.1
      *
-     * <p>Asserts that all 9 property methods in {@code ElementValidatorPropertyTest}
+     * <p>Asserts that all 12 property methods in {@code ElementValidatorPropertyTest}
      * have {@code tries = 5}. FAILS on unfixed code (currently tries=100).
      */
     @Test
     void elementValidatorPropertyTest_allPropertiesHaveTries5() {
         assertTriesAndCount(
                 loadClass("rawit.processors.validation.ElementValidatorPropertyTest"),
-                EXPECTED_TRIES, 9);
+                EXPECTED_TRIES, 12);
     }
 
     /**
      * Validates: Requirements 2.2
      *
-     * <p>Asserts that all 5 property methods in {@code BytecodeInjectorPropertyTest}
+     * <p>Asserts that all 7 property methods in {@code BytecodeInjectorPropertyTest}
      * have {@code tries = 5}. FAILS on unfixed code (currently tries=100).
      */
     @Test
     void bytecodeInjectorPropertyTest_allPropertiesHaveTries5() {
         assertTriesAndCount(
                 loadClass("rawit.processors.inject.BytecodeInjectorPropertyTest"),
-                EXPECTED_TRIES, 5);
+                EXPECTED_TRIES, 7);
     }
 
     /**
@@ -117,13 +117,13 @@ class SlowTestsBugConditionExplorationTest {
     /**
      * Validates: Requirements 2.4
      *
-     * <p>Asserts that all 3 property methods in {@code RawitAnnotationProcessorConstructorPropertyTest}
+     * <p>Asserts that all 9 property methods in {@code RawitAnnotationProcessorConstructorPropertyTest}
      * have {@code tries = 5}. FAILS on unfixed code (currently tries=10).
      */
     @Test
     void rawitAnnotationProcessorConstructorPropertyTest_allPropertiesHaveTries5() {
         assertTriesAndCount(
                 loadClass("rawit.processors.RawitAnnotationProcessorConstructorPropertyTest"),
-                EXPECTED_TRIES, 3);
+                EXPECTED_TRIES, 9);
     }
 }

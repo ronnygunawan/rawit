@@ -21,8 +21,8 @@ foo.bar().x(10).y(20).invoke();
 ## ✨ Features
 
 - **`@Invoker`** — turns any non-private method (instance or static) into a staged call chain ending with `.invoke()`
-- **`@Constructor`** — injects a `public static constructor()` entry point for staged object construction ending with `.construct()`
-- Works on **instance methods** and **static methods** (`@Invoker`), and **constructors** (`@Constructor`)
+- **`@Constructor`** — injects a `public static constructor()` entry point for staged object construction ending with `.construct()`. Works on explicit constructors and directly on **record types**
+- Works on **instance methods** and **static methods** (`@Invoker`), **constructors**, and **record type declarations** (`@Constructor`)
 - Supports **overload groups** — multiple overloads with the same name share a single entry point and branch only where their signatures diverge
 - **Zero runtime dependency** — the processor runs at compile time only
 - Operates like **Lombok** — generates inner classes and interfaces via JavaPoet, and injects the parameterless entry-point overload directly into the original `.class` file using ASM
@@ -182,6 +182,10 @@ public class Point {
         this.y = y;
     }
 }
+
+// Records — just annotate the type, no explicit constructor needed
+@Constructor
+public record Coord(int x, int y) {}
 ```
 
 ### 3. Use the generated API
@@ -203,6 +207,12 @@ Point p = Point.constructor()
                .x(1)
                .y(2)
                .construct(); // == new Point(1, 2)
+
+// Record constructor — same API, no boilerplate
+Coord c = Coord.constructor()
+               .x(5)
+               .y(10)
+               .construct(); // == new Coord(5, 10)
 ```
 
 ---
@@ -233,7 +243,9 @@ mailer.sendEmail()
 
 ### `@Constructor`
 
-Place on any **non-private** constructor with **at least one parameter**.
+Place on any **non-private** constructor with **at least one parameter**, or directly on a **record type declaration**.
+
+#### On a constructor
 
 ```java
 @Constructor
@@ -251,6 +263,25 @@ User user = User.constructor()
                 .name("Alice")
                 .construct();
 ```
+
+#### On a record type
+
+```java
+@Constructor
+public record Config(String name, int port, boolean secure) {}
+```
+
+The processor derives parameters from the record's components automatically — no explicit constructor needed. The generated API is identical:
+
+```java
+Config cfg = Config.constructor()
+                   .name("server")
+                   .port(8080)
+                   .secure(true)
+                   .construct();
+```
+
+Records with zero components are rejected at compile time (`staged construction requires at least one record component`). Placing `@Constructor` on a non-record type (class, interface, enum) is also a compile-time error.
 
 ---
 
@@ -282,6 +313,9 @@ Rawit catches mistakes early. You'll get a clear `javac` error for:
 | `@Invoker` on a `private` method | `@Invoker requires at least package-private visibility` |
 | `@Constructor` on a non-constructor element | `@Constructor may only target constructors` |
 | `@Constructor` on a zero-parameter constructor | `staged construction requires at least one parameter` |
+| `@Constructor` on a non-record type (class, interface, enum) | `@Constructor on a type is only supported for records` |
+| `@Constructor` on a record with zero components | `staged construction requires at least one record component` |
+| `@Constructor` on a record with existing `constructor()` method | `a parameterless overload named 'constructor' already exists` |
 | A `bar()` overload already exists | `a parameterless overload named 'bar' already exists` |
 | Same parameter name with conflicting types across overloads | conflict error with details |
 

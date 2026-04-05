@@ -312,4 +312,107 @@ class ElementValidatorTest {
         assertTrue(errors(diags).isEmpty(),
                 "Expected no errors for a valid @Constructor, got: " + errors(diags));
     }
+
+    // =========================================================================
+    // Requirement 2.1 — @Constructor on a valid record with components → no errors
+    // =========================================================================
+
+    @Test
+    void constructorAnnotation_validRecordWithComponents_noErrors() {
+        // Req 2.1: @Constructor on a record with ≥1 component must produce no errors
+        String source = """
+                import rawit.Constructor;
+                @Constructor
+                public record ValidRecord(int x, int y) {}
+                """;
+
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("ValidRecord", source);
+
+        assertTrue(errors(diags).isEmpty(),
+                "Expected no errors for a valid @Constructor on a record, got: " + errors(diags));
+    }
+
+    // =========================================================================
+    // Requirement 2.2 — @Constructor on a record with zero components → ERROR
+    // =========================================================================
+
+    @Test
+    void constructorAnnotation_zeroComponentRecord_emitsError() {
+        // Req 2.2: @Constructor on a record with zero components must produce an ERROR
+        String source = """
+                import rawit.Constructor;
+                @Constructor
+                public record EmptyRecord() {}
+                """;
+
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("EmptyRecord", source);
+
+        assertTrue(hasErrorContaining(diags, "at least one record component"),
+                "Expected error about requiring at least one record component, got: " + errors(diags));
+    }
+
+    // =========================================================================
+    // Requirement 2.3 — @Constructor on a regular class (not a record) → ERROR
+    // =========================================================================
+
+    @Test
+    void constructorAnnotation_onRegularClass_emitsError() {
+        // Req 2.3: @Constructor on a non-record type must produce an ERROR
+        String source = """
+                import rawit.Constructor;
+                @Constructor
+                public class NotARecord {
+                    private final int x;
+                    public NotARecord(int x) { this.x = x; }
+                }
+                """;
+
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("NotARecord", source);
+
+        assertTrue(hasErrorContaining(diags, "only supported for records"),
+                "Expected error about records only, got: " + errors(diags));
+    }
+
+    // =========================================================================
+    // Requirement 2.3 — @Constructor on an interface → ERROR
+    // =========================================================================
+
+    @Test
+    void constructorAnnotation_onInterface_emitsError() {
+        // Req 2.3: @Constructor on an interface must produce an ERROR
+        String source = """
+                import rawit.Constructor;
+                @Constructor
+                public interface NotARecord {}
+                """;
+
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("NotARecord", source);
+
+        assertTrue(hasErrorContaining(diags, "only supported for records"),
+                "Expected error about records only, got: " + errors(diags));
+    }
+
+    // =========================================================================
+    // Requirement 2.4 — @Constructor on a record with existing constructor() → ERROR
+    // =========================================================================
+
+    @Test
+    void constructorAnnotation_recordWithExistingConstructorMethod_emitsError() {
+        // Req 2.4: @Constructor on a record that already has a zero-param static
+        // method named "constructor" must produce an ERROR about the conflict
+        String source = """
+                import rawit.Constructor;
+                @Constructor
+                public record ConflictRecord(int x) {
+                    public static ConflictRecord constructor() {
+                        return new ConflictRecord(0);
+                    }
+                }
+                """;
+
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("ConflictRecord", source);
+
+        assertTrue(hasErrorContaining(diags, "already exists"),
+                "Expected error about existing 'constructor' method, got: " + errors(diags));
+    }
 }

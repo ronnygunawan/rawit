@@ -8,6 +8,7 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
 import javax.tools.Diagnostic;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Validates elements annotated with {@code @Invoker} or {@code @Constructor}.
@@ -39,7 +40,18 @@ public class ElementValidator {
         if (hasInvoker) {
             return validateInvoker(element, messager);
         } else if (hasConstructor) {
-            return validateConstructor(element, messager);
+            if (element instanceof TypeElement te && te.getKind() == ElementKind.RECORD) {
+                return validateConstructorOnType(element, messager);
+            }
+            if (element.getKind() == ElementKind.CONSTRUCTOR) {
+                return validateConstructorOnExecutable(element, messager);
+            }
+            // Not a record type and not a constructor → error
+            messager.printMessage(
+                    Diagnostic.Kind.ERROR,
+                    "@Constructor on a type is only supported for records",
+                    element);
+            return ValidationResult.invalid();
         }
 
         // No recognised annotation — nothing to validate
@@ -98,10 +110,10 @@ public class ElementValidator {
     }
 
     // -------------------------------------------------------------------------
-    // @Constructor validation
+    // @Constructor validation (ExecutableElement — explicit constructor)
     // -------------------------------------------------------------------------
 
-    private ValidationResult validateConstructor(final Element element, final Messager messager) {
+    private ValidationResult validateConstructorOnExecutable(final Element element, final Messager messager) {
         boolean hasError = false;
 
         // Requirement 15.1 — must be a CONSTRUCTOR
@@ -142,6 +154,48 @@ public class ElementValidator {
                     "a parameterless overload named 'constructor' already exists on this class",
                     element);
             hasError = true;
+        }
+
+        return hasError ? ValidationResult.invalid() : ValidationResult.valid();
+    }
+
+    // -------------------------------------------------------------------------
+    // @Constructor validation (TypeElement — record type)
+    // -------------------------------------------------------------------------
+
+    private ValidationResult validateConstructorOnType(final Element element, final Messager messager) {
+        boolean hasError = false;
+
+        // Requirement 2.3 — must be a RECORD (not CLASS, INTERFACE, ENUM)
+        if (!(element instanceof TypeElement typeElement)
+                || typeElement.getKind() != ElementKind.RECORD) {
+            messager.printMessage(
+                    Diagnostic.Kind.ERROR,
+                    "@Constructor on a type is only supported for records",
+                    element);
+            hasError = true;
+        }
+
+        if (element instanceof TypeElement typeElement
+                && typeElement.getKind() == ElementKind.RECORD) {
+
+            // Requirement 2.2 — record must have ≥ 1 record component
+            if (typeElement.getRecordComponents().isEmpty()) {
+                messager.printMessage(
+                        Diagnostic.Kind.ERROR,
+                        "staged construction requires at least one record component",
+                        element);
+                hasError = true;
+            }
+
+            // Requirement 2.4 — no existing zero-param static method named "constructor"
+            if (typeHasZeroParamStaticMethod(typeElement, "constructor")) {
+                messager.printMessage(
+                        Diagnostic.Kind.ERROR,
+                        "a parameterless overload named 'constructor' already exists",
+                        element);
+                hasError = true;
+            }
         }
 
         return hasError ? ValidationResult.invalid() : ValidationResult.valid();
@@ -193,6 +247,27 @@ public class ElementValidator {
             final ExecutableElement candidate = (ExecutableElement) enclosed;
             if (candidate.getSimpleName().contentEquals(methodName)
                     && candidate.getParameters().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Scans the enclosed elements of the given {@link TypeElement} for a zero-parameter
+     * static method with the given name. Used for record-type conflict detection where
+     * the type element IS the enclosing element (unlike the constructor case).
+     */
+    private boolean typeHasZeroParamStaticMethod(final TypeElement typeElement,
+                                                  final String methodName) {
+        for (final Element enclosed : typeElement.getEnclosedElements()) {
+            if (enclosed.getKind() != ElementKind.METHOD) {
+                continue;
+            }
+            final ExecutableElement candidate = (ExecutableElement) enclosed;
+            if (candidate.getSimpleName().contentEquals(methodName)
+                    && candidate.getParameters().isEmpty()
+                    && candidate.getModifiers().contains(Modifier.STATIC)) {
                 return true;
             }
         }

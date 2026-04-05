@@ -426,4 +426,143 @@ class BytecodeInjectorPropertyTest {
             deleteDir(tempDir);
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Property 7: Bytecode injection produces correct entry point for records
+    // Feature: record-constructor-support, Property 7: Bytecode injection produces correct entry point for records
+    // Validates: Requirements 6.1, 6.2
+    // -------------------------------------------------------------------------
+
+    @Property(tries = 5)
+    @Tag("Feature: record-constructor-support, Property 7: Bytecode injection produces correct entry point for records")
+    void property7_bytecodeInjectionProducesCorrectEntryPointForRecords(
+            @ForAll("paramList") List<Parameter> params
+    ) throws Exception {
+        final String recordName = uniqueClassName("Rec7");
+        final String source = "public record " + recordName + "(" + buildParamList(params) + ") {}";
+
+        final Path tempDir = Files.createTempDirectory("prop7_");
+        try {
+            final Path classFile = compileClass(recordName, source, tempDir);
+
+            // Verify no constructor() method exists before injection
+            assertFalse(readMethods(classFile).getOrDefault("constructor", List.of()).stream()
+                            .anyMatch(d -> d.startsWith("()")),
+                    "record must not have constructor() before injection");
+
+            // Build AnnotatedMethod for a record: isConstructor=true, isConstructorAnnotation=true
+            final AnnotatedMethod method = new AnnotatedMethod(
+                    recordName, "<init>", false, true, true,
+                    params, "V", List.of(), Opcodes.ACC_PUBLIC);
+            final MergeTree tree = linearTree(method);
+
+            final List<String> errors = new ArrayList<>();
+            new BytecodeInjector().inject(classFile, List.of(tree), mockEnv(errors));
+
+            assertTrue(errors.isEmpty(), "no errors expected: " + errors);
+
+            // Verify constructor() method was injected
+            final String descriptor = zeroParamMethodDescriptor(classFile, "constructor");
+            assertNotNull(descriptor, "record must have a parameterless constructor() after injection");
+
+            // Verify it is public static
+            final int access = zeroParamMethodAccess(classFile, "constructor");
+            assertTrue((access & Opcodes.ACC_PUBLIC) != 0, "constructor() must be public");
+            assertTrue((access & Opcodes.ACC_STATIC) != 0, "constructor() must be static");
+
+            // Verify return type is the Constructor caller class (in the same package, i.e. default package here)
+            assertEquals("()LConstructor;", descriptor,
+                    "constructor() must return the Constructor caller class");
+        } finally {
+            deleteDir(tempDir);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Property 8: Injection idempotency for records
+    // Feature: record-constructor-support, Property 8: Injection idempotency
+    // Validates: Requirements 6.3
+    // -------------------------------------------------------------------------
+
+    @Property(tries = 5)
+    @Tag("Feature: record-constructor-support, Property 8: Injection idempotency")
+    void property8_injectionIdempotencyForRecords(
+            @ForAll("paramList") List<Parameter> params
+    ) throws Exception {
+        final String recordName = uniqueClassName("Rec8");
+        // Record that already has a zero-param static constructor() method
+        final String source = "public record " + recordName + "(" + buildParamList(params) + ") {\n"
+                + "    public static " + recordName + " constructor() {\n"
+                + "        return new " + recordName + "(" + buildDefaultArgs(params) + ");\n"
+                + "    }\n"
+                + "}";
+
+        final Path tempDir = Files.createTempDirectory("prop8_");
+        try {
+            final Path classFile = compileClass(recordName, source, tempDir);
+
+            // Verify constructor() already exists before injection
+            assertTrue(readMethods(classFile).getOrDefault("constructor", List.of()).stream()
+                            .anyMatch(d -> d.startsWith("()")),
+                    "record must already have constructor() before injection");
+
+            // Capture the original constructor() descriptor and access flags
+            final String originalDescriptor = zeroParamMethodDescriptor(classFile, "constructor");
+            final int originalAccess = zeroParamMethodAccess(classFile, "constructor");
+            final long originalCount = readMethods(classFile)
+                    .getOrDefault("constructor", List.of()).stream()
+                    .filter(d -> d.startsWith("()")).count();
+
+            // Build AnnotatedMethod for a record: isConstructor=true, isConstructorAnnotation=true
+            final AnnotatedMethod method = new AnnotatedMethod(
+                    recordName, "<init>", false, true, true,
+                    params, "V", List.of(), Opcodes.ACC_PUBLIC);
+            final MergeTree tree = linearTree(method);
+
+            final List<String> errors = new ArrayList<>();
+            new BytecodeInjector().inject(classFile, List.of(tree), mockEnv(errors));
+
+            assertTrue(errors.isEmpty(), "no errors expected: " + errors);
+
+            // Verify the existing constructor() method is unchanged
+            final String afterDescriptor = zeroParamMethodDescriptor(classFile, "constructor");
+            final int afterAccess = zeroParamMethodAccess(classFile, "constructor");
+            final long afterCount = readMethods(classFile)
+                    .getOrDefault("constructor", List.of()).stream()
+                    .filter(d -> d.startsWith("()")).count();
+
+            assertEquals(originalDescriptor, afterDescriptor,
+                    "constructor() descriptor must be unchanged after injection");
+            assertEquals(originalAccess, afterAccess,
+                    "constructor() access flags must be unchanged after injection");
+            assertEquals(originalCount, afterCount,
+                    "number of constructor() overloads must be unchanged — no duplicate injected");
+        } finally {
+            deleteDir(tempDir);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Helper for building default argument values for record constructor calls
+    // -------------------------------------------------------------------------
+
+    private static String buildDefaultArgs(final List<Parameter> params) {
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < params.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(defaultValueForDescriptor(params.get(i).typeDescriptor()));
+        }
+        return sb.toString();
+    }
+
+    private static String defaultValueForDescriptor(final String descriptor) {
+        return switch (descriptor) {
+            case "I", "J", "S", "B" -> "0";
+            case "Z" -> "false";
+            case "D" -> "0.0";
+            case "F" -> "0.0f";
+            case "C" -> "'a'";
+            default -> "null";
+        };
+    }
 }

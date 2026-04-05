@@ -10,6 +10,6 @@ import java.lang.annotation.Target;
  * Injects a {@code public static constructor()} entry point and a staged construction chain
  * into the enclosing class. The chain ends with {@code .construct()}.
  */
-@Target(ElementType.CONSTRUCTOR)
+@Target({ElementType.CONSTRUCTOR, ElementType.TYPE})
 @Retention(RetentionPolicy.SOURCE)
 public @interface Constructor { }

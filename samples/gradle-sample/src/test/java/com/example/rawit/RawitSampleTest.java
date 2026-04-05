@@ -24,4 +24,11 @@ class RawitSampleTest {
         assertEquals(10, p.getX());
         assertEquals(20, p.getY());
     }
+
+    @Test
+    void recordConstructor() {
+        Coord c = Coord.constructor().x(1).y(2).construct();
+        assertEquals(1, c.x());
+        assertEquals(2, c.y());
+    }
 }

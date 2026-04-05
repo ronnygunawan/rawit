@@ -93,11 +93,16 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                     continue; // skip invalid elements
                 }
 
-                if (!(element instanceof ExecutableElement exec)) {
+                final AnnotatedMethod model;
+                if (element instanceof TypeElement typeElement
+                        && typeElement.getKind() == ElementKind.RECORD) {
+                    model = buildAnnotatedMethodFromRecord(typeElement);
+                } else if (element instanceof ExecutableElement exec) {
+                    model = buildAnnotatedMethod(exec);
+                } else {
                     continue;
                 }
 
-                final AnnotatedMethod model = buildAnnotatedMethod(exec);
                 if (model != null) {
                     validMethods.add(model);
                     if (debug) {
@@ -267,6 +272,59 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                 returnTypeDescriptor,
                 checkedExceptions,
                 accessFlags);
+    }
+
+    /**
+     * Builds an {@link AnnotatedMethod} from a {@code @Constructor}-annotated record type.
+     *
+     * <p>Derives the canonical constructor parameters from the record's components in
+     * declaration order. Sets {@code methodName="<init>"}, {@code isConstructor=true},
+     * {@code isConstructorAnnotation=true}, {@code returnTypeDescriptor="V"}, and
+     * {@code checkedExceptions=List.of()}.
+     *
+     * @param recordElement the validated record type element
+     * @return the model
+     */
+    private AnnotatedMethod buildAnnotatedMethodFromRecord(final TypeElement recordElement) {
+        final String enclosingClassName = toBinaryName(recordElement);
+
+        final List<Parameter> parameters = new ArrayList<>();
+        for (final RecordComponentElement comp : recordElement.getRecordComponents()) {
+            final String name = comp.getSimpleName().toString();
+            final String descriptor = toTypeDescriptor(comp.asType());
+            parameters.add(new Parameter(name, descriptor));
+        }
+
+        final int accessFlags = resolveRecordAccessFlags(recordElement);
+
+        return new AnnotatedMethod(
+                enclosingClassName,
+                "<init>",
+                false,
+                true,
+                true,
+                parameters,
+                "V",
+                List.of(),
+                accessFlags);
+    }
+
+    /**
+     * Resolves ASM-compatible access flags from a record type's modifiers.
+     *
+     * <p>The canonical constructor of a record inherits the visibility of the record type
+     * itself (public record → ACC_PUBLIC, protected record → ACC_PROTECTED, etc.).
+     *
+     * @param typeElement the record type element
+     * @return the ASM access flags
+     */
+    private static int resolveRecordAccessFlags(final TypeElement typeElement) {
+        final Set<Modifier> mods = typeElement.getModifiers();
+        int flags = 0;
+        if (mods.contains(Modifier.PUBLIC))    flags |= 0x0001; // ACC_PUBLIC
+        if (mods.contains(Modifier.PROTECTED)) flags |= 0x0004; // ACC_PROTECTED
+        // package-private: no visibility flag set (flags == 0)
+        return flags;
     }
 
     /**
