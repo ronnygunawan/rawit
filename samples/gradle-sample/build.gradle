@@ -12,8 +12,8 @@ repositories {
 }
 
 dependencies {
-    annotationProcessor 'io.github.ronnygunawan:rawit:0.0.6'
-    compileOnly 'io.github.ronnygunawan:rawit:0.0.6'
+    annotationProcessor 'io.github.ronnygunawan:rawit:0.0.7'
+    compileOnly 'io.github.ronnygunawan:rawit:0.0.7'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
 }
@@ -33,8 +33,11 @@ task processAnnotations(type: JavaCompile) {
 task reinjectBytecode(type: JavaCompile) {
     source = sourceSets.main.java
     classpath = sourceSets.main.compileClasspath
-    destinationDirectory = sourceSets.main.java.classesDirectory
-    options.compilerArgs += ['-proc:only']
+    // Use a separate output dir so Gradle doesn't delete main class files.
+    // The processor reads/writes .class files from the classpath (CLASS_OUTPUT),
+    // not from this task's destinationDirectory.
+    destinationDirectory = layout.buildDirectory.dir('classes/java/reinject')
+    options.compilerArgs += ['-proc:only', '-d', sourceSets.main.java.classesDirectory.get().asFile.absolutePath]
     options.annotationProcessorPath = configurations.annotationProcessor
     options.incremental = false
     outputs.upToDateWhen { false }
