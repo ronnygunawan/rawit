@@ -194,6 +194,9 @@ public class GetterBytecodeInjector {
                     accessFlags, field.getterName(), methodDescriptor, methodSignature, null);
             if (mv == null) return;
 
+            // Mark with @GeneratedGetter so cross-compilation collision detection works
+            mv.visitAnnotation("Lrawit/processors/inject/GeneratedGetter;", false).visitEnd();
+
             mv.visitCode();
 
             if (field.isStatic()) {
