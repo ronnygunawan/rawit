@@ -25,12 +25,20 @@ task processAnnotations(type: JavaCompile) {
     source = sourceSets.main.java
     classpath = sourceSets.main.compileClasspath
     destinationDirectory = sourceSets.main.java.classesDirectory
-    options.compilerArgs += ['-proc:only']
     options.annotationProcessorPath = configurations.annotationProcessor
     dependsOn compileJava
 }
 
-classes.dependsOn processAnnotations
+task reinjectBytecode(type: JavaCompile) {
+    source = sourceSets.main.java
+    classpath = sourceSets.main.compileClasspath
+    destinationDirectory = sourceSets.main.java.classesDirectory
+    options.compilerArgs += ['-proc:only']
+    options.annotationProcessorPath = configurations.annotationProcessor
+    dependsOn processAnnotations
+}
+
+classes.dependsOn reinjectBytecode
 
 test {
     useJUnitPlatform()

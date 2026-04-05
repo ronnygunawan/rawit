@@ -51,6 +51,13 @@
                         <goals>
                             <goal>compile</goal>
                         </goals>
+                    </execution>
+                    <execution>
+                        <id>reinject-bytecode</id>
+                        <phase>process-test-sources</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
                         <configuration>
                             <compilerArgument>-proc:only</compilerArgument>
                         </configuration>
