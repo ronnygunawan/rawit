@@ -27,8 +27,8 @@ class RawitSampleTest {
 
     @Test
     void recordConstructor() {
-        Coord c = Coord.constructor().x(1).y(2).construct();
-        assertEquals(1, c.x());
-        assertEquals(2, c.y());
+        Coord c = Coord.constructor().lat(1).lon(2).construct();
+        assertEquals(1, c.lat());
+        assertEquals(2, c.lon());
     }
 }
