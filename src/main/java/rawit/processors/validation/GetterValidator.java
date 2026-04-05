@@ -2,7 +2,6 @@ package rawit.processors.validation;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.TypeElement;

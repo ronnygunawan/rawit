@@ -3,6 +3,7 @@ package rawit.processors.getter;
 import rawit.processors.model.AnnotatedField;
 
 import javax.annotation.processing.Messager;
+import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -298,6 +299,8 @@ public class GetterCollisionDetector {
         }
 
         // Strategy 2: Cross-compilation — check for @GeneratedGetter marker on methods
+        // Uses getAnnotationMirrors() instead of getAnnotation() because @GeneratedGetter
+        // has CLASS retention, and getAnnotation() only works for RUNTIME retention.
         for (final Element enclosed : typeElement.getEnclosedElements()) {
             if (enclosed.getKind() != ElementKind.METHOD) {
                 continue;
@@ -305,7 +308,7 @@ public class GetterCollisionDetector {
             final ExecutableElement method = (ExecutableElement) enclosed;
             if (method.getSimpleName().contentEquals(getterName)
                     && method.getParameters().isEmpty()
-                    && method.getAnnotation(rawit.processors.inject.GeneratedGetter.class) != null) {
+                    && hasAnnotationByName(method, GENERATED_GETTER_FQN)) {
                 return true;
             }
         }
@@ -316,6 +319,9 @@ public class GetterCollisionDetector {
     /**
      * Checks whether the given type has a zero-param method with the given name that carries
      * the {@code @GeneratedGetter} CLASS-retained marker annotation.
+     * Uses {@code getAnnotationMirrors()} instead of {@code getAnnotation()} because
+     * {@code @GeneratedGetter} has CLASS retention and {@code getAnnotation()} only works
+     * for RUNTIME-retained annotations.
      */
     private boolean hasGeneratedGetterMethod(TypeElement typeElement, String methodName) {
         for (final Element enclosed : typeElement.getEnclosedElements()) {
@@ -325,7 +331,24 @@ public class GetterCollisionDetector {
             final ExecutableElement method = (ExecutableElement) enclosed;
             if (method.getSimpleName().contentEquals(methodName)
                     && method.getParameters().isEmpty()
-                    && method.getAnnotation(rawit.processors.inject.GeneratedGetter.class) != null) {
+                    && hasAnnotationByName(method, GENERATED_GETTER_FQN)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final String GENERATED_GETTER_FQN = "rawit.processors.inject.GeneratedGetter";
+
+    /**
+     * Checks whether the given element has an annotation whose fully qualified name matches
+     * the given FQN. Uses {@code getAnnotationMirrors()} which works for all retention policies
+     * (including CLASS), unlike {@code getAnnotation()} which only works for RUNTIME.
+     */
+    private static boolean hasAnnotationByName(Element element, String annotationFqn) {
+        for (final AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            final TypeElement annotationType = (TypeElement) mirror.getAnnotationType().asElement();
+            if (annotationType.getQualifiedName().contentEquals(annotationFqn)) {
                 return true;
             }
         }
