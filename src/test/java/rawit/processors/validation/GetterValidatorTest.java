@@ -137,10 +137,13 @@ class GetterValidatorTest {
     // =========================================================================
 
     @Test
-    void getter_anonymousClassField_silentlyIgnored() {
+    void getter_anonymousClassField_notDiscoveredByProcessor() {
         // Req 11.1: @Getter on a field inside an anonymous class is not discovered
-        // by the annotation processor (roundEnv does not include it), so no
-        // getter-related diagnostics should be emitted.
+        // by the annotation processor. This is a javac limitation:
+        // roundEnv.getElementsAnnotatedWith() does not include annotations on fields
+        // inside anonymous classes, so the processor never processes them. The
+        // GetterValidator's anonymous class check exists as a safety net but is not
+        // exercised in practice through this code path.
         String source = """
                 import rawit.Getter;
                 public class AnonClassTest {

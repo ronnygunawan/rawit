@@ -220,16 +220,18 @@ class GetterValidatorPropertyTest {
     // -------------------------------------------------------------------------
 
     @Property(tries = 5)
-    void property6_anonymousClassFieldRejected(
+    void property6_anonymousClassFieldNotDiscoveredByProcessor(
             @ForAll("fieldTypes") String fieldType,
             @ForAll("fieldNames") String fieldName) {
         // Feature: getter-annotation, Property 6: Anonymous class fields are rejected, all other class kinds accepted
         // **Validates: Requirements 11.1, 11.2, 11.3, 11.4, 11.5**
         //
-        // Anonymous class fields annotated with @Getter are not discovered by
-        // roundEnv.getElementsAnnotatedWith() during annotation processing, so the
-        // processor never processes them. We verify that no getter-related output
-        // (errors or notes) is produced — the field is silently ignored.
+        // Anonymous class fields annotated with @Getter are not discovered by the
+        // annotation processor. This is a javac limitation:
+        // roundEnv.getElementsAnnotatedWith() does not include annotations on fields
+        // inside anonymous classes, so the processor never processes them. The
+        // GetterValidator's anonymous class check exists as a safety net but is not
+        // exercised in practice through this code path.
 
         String className = uniqueClassName("AnonClassHost");
 

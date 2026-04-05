@@ -159,7 +159,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
             if (classFilePath.isEmpty()) {
                 if (debug) {
                     messager.printMessage(Diagnostic.Kind.NOTE,
-                            "[invoker.debug] .class file not found for "
+                            "[getter.debug] .class file not found for "
                                     + enclosingClassName.replace('/', '.')
                                     + " — skipping @Getter bytecode injection");
                 }
@@ -169,7 +169,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
             // Step 6: Inject getter methods
             if (debug) {
                 messager.printMessage(Diagnostic.Kind.NOTE,
-                        "[invoker.debug] Injecting @Getter methods into: " + classFilePath.get());
+                        "[getter.debug] Injecting @Getter methods into: " + classFilePath.get());
             }
 
             getterBytecodeInjector.inject(classFilePath.get(), classFields, processingEnv);
