@@ -150,7 +150,7 @@ class JavaPoetGeneratorTest {
         new JavaPoetGenerator(mockMessager).generate(List.of(tree), mockEnv);
 
         assertFalse(notes.isEmpty(), "must emit a NOTE on successful generation");
-        assertTrue(notes.stream().anyMatch(n -> n.contains("Bar")),
+        assertTrue(notes.stream().anyMatch(n -> n.contains("FooBarInvoker")),
                 "NOTE must mention the generated class name");
     }
 
@@ -162,7 +162,7 @@ class JavaPoetGeneratorTest {
         new JavaPoetGenerator(mockMessager).generate(List.of(tree), mockEnv);
 
         String allSource = String.join("\n", written.values());
-        assertTrue(allSource.contains("class Bar"), "generated source must contain the Bar class");
+        assertTrue(allSource.contains("class FooBarInvoker"), "generated source must contain the FooBarInvoker class");
     }
 
     @Test
@@ -171,6 +171,10 @@ class JavaPoetGeneratorTest {
         MergeTree tree = linearTree(m);
 
         new JavaPoetGenerator(mockMessager).generate(List.of(tree), mockEnv);
+
+        // Verify the file is written under the .generated subpackage
+        assertTrue(written.containsKey("com.example.generated.FooBarInvoker"),
+                "file key must use .generated subpackage: " + written.keySet());
 
         String allSource = String.join("\n", written.values());
         assertTrue(allSource.contains("XStageInvoker"), "must contain XStageInvoker");

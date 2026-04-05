@@ -1,4 +1,4 @@
-package com.example.invoker;
+package com.example.model;
 
 import rawit.Invoker;
 

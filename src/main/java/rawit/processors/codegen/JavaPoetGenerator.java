@@ -94,9 +94,10 @@ public class JavaPoetGenerator {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static String resolvePackageName(final String binaryName) {
+    static String resolvePackageName(final String binaryName) {
         final String dotName = binaryName.replace('/', '.');
         final int lastDot = dotName.lastIndexOf('.');
-        return lastDot < 0 ? "" : dotName.substring(0, lastDot);
+        final String pkg = lastDot < 0 ? "" : dotName.substring(0, lastDot);
+        return pkg.isEmpty() ? "" : pkg + ".generated";
     }
 }

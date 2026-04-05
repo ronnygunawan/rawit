@@ -257,31 +257,26 @@ public class BytecodeInjector {
 
         private static String resolveCallerClassBinaryName(final MergeTree tree) {
             final String enclosing = tree.group().enclosingClassName();
+            final int lastSlash = enclosing.lastIndexOf('/');
+            final String simpleName = lastSlash < 0 ? enclosing : enclosing.substring(lastSlash + 1);
+            final String packagePrefix = packagePrefix(enclosing);
+
             final boolean isConstructorAnnotationGroup = tree.group().members().stream()
                     .allMatch(m -> m.isConstructorAnnotation());
             if (isConstructorAnnotationGroup) {
-                // @Constructor: the Constructor class is a top-level class in the same package
-                // as the enclosing class, named "Constructor"
-                final String packagePrefix = packagePrefix(enclosing);
-                return packagePrefix + "Constructor";
+                return packagePrefix + simpleName + "Constructor";
             }
-            // @Invoker: the Caller_Class is a top-level class in the same package as the enclosing
-            // class, named after the method in PascalCase (e.g. "Add" for method "add")
             final String groupName = tree.group().groupName();
-            final String packagePrefix = packagePrefix(enclosing);
             if ("<init>".equals(groupName)) {
-                // @Invoker on a constructor: use the class name + "Invoker" as the caller class name
-                final int lastSlash = enclosing.lastIndexOf('/');
-                final String simpleName = lastSlash < 0 ? enclosing : enclosing.substring(lastSlash + 1);
                 return packagePrefix + simpleName + "Invoker";
             }
-            return packagePrefix + toPascalCase(groupName);
+            return packagePrefix + simpleName + toPascalCase(groupName) + "Invoker";
         }
 
         private static String packagePrefix(final String binaryClassName) {
             final int lastSlash = binaryClassName.lastIndexOf('/');
             if (lastSlash < 0) return "";
-            return binaryClassName.substring(0, lastSlash + 1);
+            return binaryClassName.substring(0, lastSlash + 1) + "generated/";
         }
 
         private static String toPascalCase(final String name) {

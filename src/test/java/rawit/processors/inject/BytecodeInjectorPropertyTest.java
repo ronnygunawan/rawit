@@ -326,9 +326,9 @@ class BytecodeInjectorPropertyTest {
 
             assertTrue(errors.isEmpty(), "no errors expected: " + errors);
 
-            // Expected return descriptor: L<PascalMethod>;
-            // (The return type is now the top-level caller class, not the first stage interface)
-            final String expectedReturnDescriptor = "L" + toPascalCase(methodName) + ";";
+            // Expected return descriptor: L<ClassName><PascalMethod>Invoker;
+            // Default-package classes stay in the default package (no generated/ prefix)
+            final String expectedReturnDescriptor = "L" + className + toPascalCase(methodName) + "Invoker;";
             final String expectedMethodDescriptor = "()" + expectedReturnDescriptor;
 
             final String actualDescriptor = zeroParamMethodDescriptor(classFile, methodName);
@@ -470,9 +470,9 @@ class BytecodeInjectorPropertyTest {
             assertTrue((access & Opcodes.ACC_PUBLIC) != 0, "constructor() must be public");
             assertTrue((access & Opcodes.ACC_STATIC) != 0, "constructor() must be static");
 
-            // Verify return type is the Constructor caller class (in the same package, i.e. default package here)
-            assertEquals("()LConstructor;", descriptor,
-                    "constructor() must return the Constructor caller class");
+            // Verify return type is the <RecordName>Constructor caller class (default package, no generated/ prefix)
+            assertEquals("()L" + recordName + "Constructor;", descriptor,
+                    "constructor() must return the <RecordName>Constructor caller class");
         } finally {
             deleteDir(tempDir);
         }
@@ -564,5 +564,118 @@ class BytecodeInjectorPropertyTest {
             case "C" -> "'a'";
             default -> "null";
         };
+    }
+
+    // -------------------------------------------------------------------------
+    // Property 2: BytecodeInjector binary name correctness
+    // Feature: generated-class-naming, Property 2: BytecodeInjector binary name correctness
+    // Validates: Requirements 1.2, 2.2, 3.2, 4.2, 5.3
+    // -------------------------------------------------------------------------
+
+    /** Packages to test: one multi-segment, one single-segment, and default (empty). */
+    @Provide
+    Arbitrary<String> anyPackage() {
+        return Arbitraries.of("com.example", "mylib", "");
+    }
+
+    /**
+     * Scenario descriptor for the three annotation kinds:
+     * "invokerMethod", "invokerConstructor", "constructor".
+     */
+    @Provide
+    Arbitrary<String> anyAnnotationKind() {
+        return Arbitraries.of("invokerMethod", "invokerConstructor", "constructor");
+    }
+
+    @Property(tries = 5)
+    @Tag("Feature: generated-class-naming, Property 2: BytecodeInjector binary name correctness")
+    void property2_binaryNameCorrectness(
+            @ForAll("anyPackage") String pkg,
+            @ForAll("anyMethodName") String methodName,
+            @ForAll("paramList") List<Parameter> params,
+            @ForAll("anyAnnotationKind") String annotationKind
+    ) throws Exception {
+        final String simpleClassName = uniqueClassName("BN2");
+        final String fqClassName = pkg.isEmpty() ? simpleClassName : pkg + "." + simpleClassName;
+        // Binary name uses '/' separators
+        final String binaryEnclosing = fqClassName.replace('.', '/');
+
+        // Build source code
+        final String source;
+        if ("constructor".equals(annotationKind) || "invokerConstructor".equals(annotationKind)) {
+            // Class with a constructor taking params
+            final String pkgDecl = pkg.isEmpty() ? "" : "package " + pkg + ";\n";
+            source = pkgDecl + "public class " + simpleClassName + " {\n"
+                    + "    public " + simpleClassName + "(" + buildParamList(params) + ") {}\n"
+                    + "}";
+        } else {
+            // Class with an instance method
+            final String pkgDecl = pkg.isEmpty() ? "" : "package " + pkg + ";\n";
+            source = pkgDecl + "public class " + simpleClassName + " {\n"
+                    + "    public int " + methodName + "(" + buildParamList(params) + ") { return 0; }\n"
+                    + "}";
+        }
+
+        final Path tempDir = Files.createTempDirectory("bn2_");
+        try {
+            final Path classFile = compileClass(fqClassName, source, tempDir);
+
+            // Build AnnotatedMethod and MergeTree based on annotation kind
+            final AnnotatedMethod method;
+            final String expectedOverloadName;
+            final String expectedBinaryName;
+            final String pkgPrefix = pkg.isEmpty() ? "" : binaryEnclosing.substring(0, binaryEnclosing.lastIndexOf('/') + 1) + "generated/";
+
+            switch (annotationKind) {
+                case "invokerMethod" -> {
+                    method = new AnnotatedMethod(
+                            binaryEnclosing, methodName, false, false,
+                            params, "I", List.of(), Opcodes.ACC_PUBLIC);
+                    expectedOverloadName = methodName;
+                    expectedBinaryName = pkgPrefix + simpleClassName + toPascalCase(methodName) + "Invoker";
+                }
+                case "invokerConstructor" -> {
+                    method = new AnnotatedMethod(
+                            binaryEnclosing, "<init>", false, true, false,
+                            params, "V", List.of(), Opcodes.ACC_PUBLIC);
+                    expectedOverloadName = simpleClassName.toLowerCase();
+                    expectedBinaryName = pkgPrefix + simpleClassName + "Invoker";
+                }
+                case "constructor" -> {
+                    method = new AnnotatedMethod(
+                            binaryEnclosing, "<init>", false, true, true,
+                            params, "V", List.of(), Opcodes.ACC_PUBLIC);
+                    expectedOverloadName = "constructor";
+                    expectedBinaryName = pkgPrefix + simpleClassName + "Constructor";
+                }
+                default -> throw new IllegalStateException("Unknown kind: " + annotationKind);
+            }
+
+            final MergeTree tree = linearTree(method);
+
+            final List<String> errors = new ArrayList<>();
+            new BytecodeInjector().inject(classFile, List.of(tree), mockEnv(errors));
+
+            assertTrue(errors.isEmpty(), "no errors expected: " + errors);
+
+            // Read the injected method descriptor and verify the binary name
+            final String descriptor = zeroParamMethodDescriptor(classFile, expectedOverloadName);
+            assertNotNull(descriptor,
+                    "parameterless " + expectedOverloadName + "() must exist after injection");
+
+            final String expectedDescriptor = "()L" + expectedBinaryName + ";";
+            assertEquals(expectedDescriptor, descriptor,
+                    "return type descriptor must reference the caller class"
+                            + " (annotationKind=" + annotationKind + ", pkg=" + (pkg.isEmpty() ? "<default>" : pkg) + ")");
+
+            // For packaged classes, verify the generated/ segment is present in the binary name
+            // For default package, generated code stays in the default package (no generated/ prefix)
+            if (!pkg.isEmpty()) {
+                assertTrue(descriptor.contains("generated/"),
+                        "binary name must contain 'generated/' segment for packaged classes");
+            }
+        } finally {
+            deleteDir(tempDir);
+        }
     }
 }

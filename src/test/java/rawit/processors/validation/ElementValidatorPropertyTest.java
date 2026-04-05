@@ -150,6 +150,7 @@ class ElementValidatorPropertyTest {
         String params = buildParams(paramTypes);
 
         String source = """
+                package testpkg;
                 import rawit.Invoker;
                 public class %s {
                     @Invoker
@@ -157,7 +158,7 @@ class ElementValidatorPropertyTest {
                 }
                 """.formatted(className, visibilityPrefix, methodName, params);
 
-        List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("testpkg." + className, source);
 
         long errorCount = countErrors(diags);
         assertEquals(0, errorCount,
@@ -177,6 +178,7 @@ class ElementValidatorPropertyTest {
         String params = buildParams(paramTypes);
 
         String source = """
+                package testpkg;
                 import rawit.Invoker;
                 public class %s {
                     @Invoker
@@ -184,7 +186,7 @@ class ElementValidatorPropertyTest {
                 }
                 """.formatted(className, visibilityPrefix, className, params);
 
-        List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("testpkg." + className, source);
 
         long errorCount = countErrors(diags);
         assertEquals(0, errorCount,
@@ -204,6 +206,7 @@ class ElementValidatorPropertyTest {
         String params = buildParams(paramTypes);
 
         String source = """
+                package testpkg;
                 import rawit.Constructor;
                 public class %s {
                     @Constructor
@@ -211,7 +214,7 @@ class ElementValidatorPropertyTest {
                 }
                 """.formatted(className, visibilityPrefix, className, params);
 
-        List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("testpkg." + className, source);
 
         long errorCount = countErrors(diags);
         assertEquals(0, errorCount,
@@ -404,12 +407,13 @@ class ElementValidatorPropertyTest {
         String components = buildRecordComponents(componentTypes);
 
         String source = """
+                package testpkg;
                 import rawit.Constructor;
                 @Constructor
                 public record %s(%s) {}
                 """.formatted(className, components);
 
-        List<Diagnostic<? extends JavaFileObject>> diags = compile(className, source);
+        List<Diagnostic<? extends JavaFileObject>> diags = compile("testpkg." + className, source);
 
         long errorCount = countErrors(diags);
         assertEquals(0, errorCount,

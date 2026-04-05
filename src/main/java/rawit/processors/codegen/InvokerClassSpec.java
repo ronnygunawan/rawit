@@ -276,14 +276,14 @@ public class InvokerClassSpec {
                 .orElse("");
 
         if (overload.isConstructor()) {
-            final String enclosingSimple = binarySimpleName(overload.enclosingClassName());
-            mb.addStatement("return new $L($L)", enclosingSimple, argList);
+            final TypeName enclosingType = TerminalInterfaceSpec.binaryNameToClassName(overload.enclosingClassName());
+            mb.addStatement("return new $T($L)", enclosingType, argList);
         } else if (overload.isStatic()) {
-            final String enclosingSimple = binarySimpleName(overload.enclosingClassName());
+            final TypeName enclosingType = TerminalInterfaceSpec.binaryNameToClassName(overload.enclosingClassName());
             if ("V".equals(overload.returnTypeDescriptor())) {
-                mb.addStatement("$L.$L($L)", enclosingSimple, overload.methodName(), argList);
+                mb.addStatement("$T.$L($L)", enclosingType, overload.methodName(), argList);
             } else {
-                mb.addStatement("return $L.$L($L)", enclosingSimple, overload.methodName(), argList);
+                mb.addStatement("return $T.$L($L)", enclosingType, overload.methodName(), argList);
             }
         } else {
             if ("V".equals(overload.returnTypeDescriptor())) {
@@ -301,16 +301,16 @@ public class InvokerClassSpec {
     // -------------------------------------------------------------------------
 
     private String resolveCallerClassName() {
-        if (!isInvoker) return "Constructor";
+        final String enclosing = tree.group().enclosingClassName();
+        final int lastSlash = enclosing.lastIndexOf('/');
+        final String simpleName = lastSlash < 0 ? enclosing : enclosing.substring(lastSlash + 1);
+
+        if (!isInvoker) return simpleName + "Constructor";
         final String groupName = tree.group().groupName();
         if ("<init>".equals(groupName)) {
-            // @Invoker on a constructor: use the class name + "Invoker" as the caller class name
-            final String enclosing = tree.group().enclosingClassName();
-            final int lastSlash = enclosing.lastIndexOf('/');
-            final String simpleName = lastSlash < 0 ? enclosing : enclosing.substring(lastSlash + 1);
             return simpleName + "Invoker";
         }
-        return StageInterfaceSpec.toPascalCase(groupName);
+        return simpleName + StageInterfaceSpec.toPascalCase(groupName) + "Invoker";
     }
 
     private TypeName firstStageTypeName() {

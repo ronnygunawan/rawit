@@ -64,14 +64,14 @@ class InvokerClassSpecTest {
     void callerClassNamedAfterMethodInPascalCase() {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"));
         TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
-        assertEquals("Bar", spec.name);
+        assertEquals("FooBarInvoker", spec.name);
     }
 
     @Test
     void callerClassNamedConstructorForConstructorAnnotation() {
         AnnotatedMethod m = constructorMethod(p("id", "I"));
         TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
-        assertEquals("Constructor", spec.name);
+        assertEquals("FooConstructor", spec.name);
     }
 
     // -------------------------------------------------------------------------
@@ -83,7 +83,7 @@ class InvokerClassSpecTest {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"));
         TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
-        assertTrue(source.contains("public static final class Bar"), "must be public static final");
+        assertTrue(source.contains("public static final class FooBarInvoker"), "must be public static final");
     }
 
     @Test
@@ -121,7 +121,7 @@ class InvokerClassSpecTest {
         AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"), p("y", "I"));
         TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
         String source = toSource(spec);
-        // The accumulator Bar$WithX should have private final int x
+        // The accumulator FooBarInvoker$WithX should have private final int x
         assertTrue(source.contains("private final int x"), "accumulator must have private final int x");
     }
 
