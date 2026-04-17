@@ -2,7 +2,7 @@
 
 ## Overview
 
-Project Rawit is a Java 21 annotation processor library that transforms annotated methods and
+Project Rawit is a Java 17+ annotation processor library that transforms annotated methods and
 constructors into staged, fluent call chains at compile time. It operates like Lombok: rather than
 generating a separate companion class, it injects new members directly into the original class's
 `.class` file in the build output directory.

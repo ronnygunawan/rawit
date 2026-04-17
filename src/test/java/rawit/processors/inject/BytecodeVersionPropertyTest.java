@@ -35,7 +35,7 @@ class BytecodeVersionPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 1: Processor class files have bytecode version <= 61
-    // Feature: java17-compatibility
+    // Feature: project-rawit-invoker
     // Property 1: Processor class files have bytecode version <= 61
     // Validates: Requirements 1.1
     // -------------------------------------------------------------------------
@@ -76,7 +76,7 @@ class BytecodeVersionPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 2: BytecodeInjector preserves bytecode version through injection
-    // Feature: java17-compatibility
+    // Feature: project-rawit-invoker
     // Property 2: BytecodeInjector preserves bytecode version through injection
     // Validates: Requirements 3.3
     // -------------------------------------------------------------------------
@@ -126,7 +126,7 @@ class BytecodeVersionPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 3: BytecodeInjector produces verifiable bytecode for Java 17 class files
-    // Feature: java17-compatibility
+    // Feature: project-rawit-invoker
     // Property 3: BytecodeInjector produces verifiable bytecode for Java 17 class files
     // Validates: Requirements 3.1, 3.2
     // -------------------------------------------------------------------------
