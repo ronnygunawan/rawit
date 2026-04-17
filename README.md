@@ -63,8 +63,10 @@ dependencies {
 }
 ```
 
-That's it! No multi-pass compiler configuration needed. Rawit hooks into javac's post-generate
-phase via a `TaskListener` and injects bytecode after each `.class` file is written.
+That's it! When using `javac`, no multi-pass compiler configuration is needed. Rawit hooks into
+javac's post-generate phase via a `TaskListener` and injects bytecode after each `.class` file is
+written. On non-`javac` compilers (for example, ECJ), this single-pass injection path is not
+guaranteed, so fallback behavior or additional compiler-specific configuration may be required.
 
 ```java
 import rawit.Invoker;
