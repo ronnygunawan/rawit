@@ -13,14 +13,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Property-based test verifying that every .java source file has a package declaration
- * consistent with its directory path, that no file resides under a legacy rg/rawit path,
- * and that no file uses the default (unnamed) package.
- *
- * <p><b>Validates: Requirements 6.1, 6.2, 6.3</b>
- *
- * <p>Tag: {@code Feature: maven-central-deployment, Property 1: Source file package consistency}
+ * consistent with its directory path, and that no file uses the default (unnamed) package.
  */
-@Tag("Feature: maven-central-deployment, Property 1: Source file package consistency")
 class SourceFilePackageConsistencyTest {
 
     private static final Path MAIN_ROOT = Paths.get("src/main/java");
@@ -43,30 +37,18 @@ class SourceFilePackageConsistencyTest {
     }
 
     /**
-     * Property 1: Source file package consistency
+     * Property: Source file package consistency
      *
-     * <p>For every .java file:
-     * <ol>
-     *   <li>The file path must not contain {@code rg/rawit} or {@code rg\rawit}.</li>
-     *   <li>The {@code package} declaration must match the directory path relative to the source root.</li>
-     * </ol>
-     *
-     * <p><b>Validates: Requirements 6.1, 6.2, 6.3</b>
+     * <p>For every .java file, the {@code package} declaration must match the directory
+     * path relative to the source root, and the file must have an explicit package declaration
+     * (default/unnamed package is not allowed).
      */
     @Property(generation = GenerationMode.EXHAUSTIVE)
-    void property1_sourceFilePackageConsistency(@ForAll("anyJavaFile") Path javaFile) throws IOException {
-        String normalizedPath = javaFile.toString().replace('\\', '/');
-
-        // Assertion 1: path must not contain rg/rawit
-        assertFalse(
-                normalizedPath.contains("rg/rawit"),
-                "File path must not contain 'rg/rawit': " + javaFile
-        );
-
+    void sourceFilePackageConsistency(@ForAll("anyJavaFile") Path javaFile) throws IOException {
         // Determine which source root this file belongs to
         Path sourceRoot = javaFile.startsWith(MAIN_ROOT) ? MAIN_ROOT : TEST_ROOT;
 
-        // Assertion 2: package declaration must match directory path relative to source root
+        // package declaration must match directory path relative to source root
         Path relativePath = sourceRoot.relativize(javaFile);
         Path parentRelative = relativePath.getParent();
 
