@@ -68,6 +68,8 @@ javac's post-generate phase via a `TaskListener` and injects bytecode after each
 written. On non-`javac` compilers (for example, ECJ), this single-pass injection path is not
 guaranteed, so fallback behavior or additional compiler-specific configuration may be required.
 
+### 2. Annotate your code
+
 ```java
 import rawit.Invoker;
 import rawit.Constructor;
