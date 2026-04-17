@@ -498,7 +498,7 @@ class SinglePassCompilationPropertyTest {
     ) throws Exception {
         // Feature: single-pass-compilation, Property 6: Bytecode equivalence between immediate and deferred injection
 
-        final String uniqueSuffix = Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+        final String uniqueSuffix = String.format("%08x", Objects.hash(annoType, methodName, paramCount));
 
         // --- Generate source code based on annotation type ---
         final String simpleClassName;
