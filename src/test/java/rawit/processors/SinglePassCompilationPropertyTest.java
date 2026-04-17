@@ -510,7 +510,9 @@ class SinglePassCompilationPropertyTest {
     ) throws Exception {
         // Feature: single-pass-compilation, Property 6: Bytecode equivalence between immediate and deferred injection
 
-        final String uniqueSuffix = String.format("%08x", Objects.hash(annoType, methodName, paramCount));
+        // Use short class names to avoid Windows MAX_PATH issues — the processor generates
+        // deeply nested inner classes whose .class filenames include the full outer$inner chain.
+        final String tag = annoType.charAt(0) + "" + paramCount;
 
         // --- Generate source code based on annotation type ---
         final String simpleClassName;
@@ -518,15 +520,15 @@ class SinglePassCompilationPropertyTest {
 
         switch (annoType) {
             case "INVOKER" -> {
-                simpleClassName = "SpEquiv_" + methodName + "_" + paramCount + "_" + uniqueSuffix;
+                simpleClassName = "Eq" + tag;
                 source = buildInvokerSource(simpleClassName, methodName, paramCount);
             }
             case "CONSTRUCTOR" -> {
-                simpleClassName = "SpEquivCtor_" + paramCount + "_" + uniqueSuffix;
+                simpleClassName = "Eq" + tag;
                 source = buildConstructorSource(simpleClassName, paramCount);
             }
             case "GETTER" -> {
-                simpleClassName = "SpEquivGetter_" + paramCount + "_" + uniqueSuffix;
+                simpleClassName = "Eq" + tag;
                 source = buildGetterSource(simpleClassName, paramCount);
             }
             default -> throw new IllegalArgumentException("Unknown annotation type: " + annoType);
