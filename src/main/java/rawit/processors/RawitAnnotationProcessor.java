@@ -1,5 +1,8 @@
 package rawit.processors;
 
+import com.sun.source.util.JavacTask;
+import com.sun.source.util.TaskEvent;
+import com.sun.source.util.TaskListener;
 import rawit.processors.codegen.JavaPoetGenerator;
 import rawit.processors.getter.GetterCollisionDetector;
 import rawit.processors.getter.GetterNameResolver;
@@ -37,6 +40,12 @@ import java.util.*;
  *   <li>Generate source files via {@link JavaPoetGenerator}.</li>
  *   <li>Inject parameterless overloads via {@link BytecodeInjector} once per enclosing class.</li>
  * </ol>
+ *
+ * <p>When running under javac, the processor registers a {@link TaskListener} that fires after
+ * each {@code .class} file is written (GENERATE phase). This enables single-pass compilation —
+ * no multi-pass setup is required. When not running under javac (e.g. ECJ), the processor
+ * falls back to injecting immediately if the {@code .class} file already exists (multi-pass
+ * compatible).
  */
 @SupportedOptions("invoker.debug")
 public class RawitAnnotationProcessor extends AbstractProcessor {
@@ -47,6 +56,16 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     private static final String INVOKER_ANNOTATION_FQN = "rawit.Invoker";
     private static final String CONSTRUCTOR_ANNOTATION_FQN = "rawit.Constructor";
     private static final String GETTER_ANNOTATION_FQN = "rawit.Getter";
+
+    /** Pending invoker/constructor injections deferred until the GENERATE phase. */
+    private final Map<String, List<MergeTree>> pendingInvokerInjections = new LinkedHashMap<>();
+    /** Pending getter injections deferred until the GENERATE phase. */
+    private final Map<String, List<AnnotatedField>> pendingGetterInjections = new LinkedHashMap<>();
+    /**
+     * {@code true} when a {@link TaskListener} was successfully registered on the underlying
+     * {@link JavacTask}, enabling single-pass deferred injection.
+     */
+    private boolean useTaskListener = false;
 
     private Messager messager;
     private ElementValidator elementValidator;
@@ -70,6 +89,26 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
         this.getterNameResolver = new GetterNameResolver();
         this.getterCollisionDetector = new GetterCollisionDetector();
         this.getterBytecodeInjector = new GetterBytecodeInjector();
+
+        // Try to register a post-generate TaskListener for single-pass injection.
+        // When running under javac, this allows bytecode injection in a single compilation
+        // pass because the listener fires after each .class file is written (GENERATE phase).
+        // Falls back gracefully when not running under javac (e.g. ECJ).
+        try {
+            final JavacTask javacTask = JavacTask.instance(processingEnv);
+            javacTask.addTaskListener(createPostGenerateListener());
+            useTaskListener = true;
+        } catch (final IllegalArgumentException ignored) {
+            // Not running under javac — fall back to multi-pass (expected on non-javac compilers)
+        } catch (final Exception e) {
+            // Unexpected error registering TaskListener — fall back to multi-pass
+            if (isDebugEnabled()) {
+                messager.printMessage(Diagnostic.Kind.NOTE,
+                        "[invoker.debug] Could not register post-generate TaskListener: "
+                                + e.getClass().getName() + " — " + e.getMessage()
+                                + ". Multi-pass compile required.");
+            }
+        }
     }
 
     @Override
@@ -156,23 +195,32 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
 
             // Step 5: Resolve .class file path
             final Optional<Path> classFilePath = overloadResolver.resolve(enclosingClassName, processingEnv);
-            if (classFilePath.isEmpty()) {
+            if (classFilePath.isPresent()) {
+                // File exists (e.g. multi-pass compile) — inject immediately
+                if (debug) {
+                    messager.printMessage(Diagnostic.Kind.NOTE,
+                            "[getter.debug] Injecting @Getter methods into: " + classFilePath.get());
+                }
+                getterBytecodeInjector.inject(classFilePath.get(), classFields, processingEnv);
+            } else if (useTaskListener) {
+                // File not yet written — defer injection until after the GENERATE phase
+                pendingGetterInjections.merge(enclosingClassName, new ArrayList<>(classFields), (a, b) -> {
+                    a.addAll(b);
+                    return a;
+                });
+                if (debug) {
+                    messager.printMessage(Diagnostic.Kind.NOTE,
+                            "[getter.debug] Deferred @Getter injection for: "
+                                    + enclosingClassName.replace('/', '.'));
+                }
+            } else {
                 if (debug) {
                     messager.printMessage(Diagnostic.Kind.NOTE,
                             "[getter.debug] .class file not found for "
                                     + enclosingClassName.replace('/', '.')
                                     + " — skipping @Getter bytecode injection");
                 }
-                continue;
             }
-
-            // Step 6: Inject getter methods
-            if (debug) {
-                messager.printMessage(Diagnostic.Kind.NOTE,
-                        "[getter.debug] Injecting @Getter methods into: " + classFilePath.get());
-            }
-
-            getterBytecodeInjector.inject(classFilePath.get(), classFields, processingEnv);
         }
 
         // --- Stage 1: Collect and validate annotated elements ---
@@ -284,39 +332,90 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
         javaPoetGenerator.generate(allTrees, processingEnv);
 
         // --- Stage 5: Inject parameterless overloads via ASM, once per enclosing class ---
-        // In a standard single-pass javac/Maven compile, annotation processing runs before
-        // .class files are written, so the .class file may not exist yet. We skip injection
-        // silently in that case — users who need injection must run a two-pass compile
-        // (see README for details).
+        // When a TaskListener is registered (javac), injection is deferred until after the
+        // GENERATE phase so that .class files are guaranteed to exist. When running without
+        // a TaskListener (non-javac compilers), injection happens immediately if the .class
+        // file already exists (multi-pass compatible) or is skipped silently (single-pass
+        // not supported on non-javac compilers).
         for (final Map.Entry<String, List<MergeTree>> entry : treesByClass.entrySet()) {
             final String enclosingClassName = entry.getKey();
             final List<MergeTree> classTrees = entry.getValue();
 
             final Optional<Path> classFilePath = overloadResolver.resolve(enclosingClassName, processingEnv);
-            if (classFilePath.isEmpty()) {
+            if (classFilePath.isPresent()) {
+                // File exists (e.g. multi-pass compile) — inject immediately
+                if (debug) {
+                    messager.printMessage(Diagnostic.Kind.NOTE,
+                            "[invoker.debug] Injecting overloads into: " + classFilePath.get());
+                }
+                bytecodeInjector.inject(classFilePath.get(), classTrees, processingEnv);
+                messager.printMessage(Diagnostic.Kind.NOTE,
+                        "RawitAnnotationProcessor: processed " + enclosingClassName.replace('/', '.')
+                                + " — injected " + classTrees.size() + " overload group(s)");
+            } else if (useTaskListener) {
+                // File not yet written — defer injection until after the GENERATE phase
+                pendingInvokerInjections.merge(enclosingClassName, new ArrayList<>(classTrees), (a, b) -> {
+                    a.addAll(b);
+                    return a;
+                });
+                if (debug) {
+                    messager.printMessage(Diagnostic.Kind.NOTE,
+                            "[invoker.debug] Deferred overload injection for: "
+                                    + enclosingClassName.replace('/', '.'));
+                }
+            } else {
                 if (debug) {
                     messager.printMessage(Diagnostic.Kind.NOTE,
                             "[invoker.debug] .class file not found for "
                                     + enclosingClassName.replace('/', '.')
-                                    + " — skipping bytecode injection (run a two-pass compile for injection)");
+                                    + " — skipping bytecode injection");
                 }
-                continue;
             }
-
-            if (debug) {
-                messager.printMessage(Diagnostic.Kind.NOTE,
-                        "[invoker.debug] Injecting overloads into: " + classFilePath.get());
-            }
-
-            bytecodeInjector.inject(classFilePath.get(), classTrees, processingEnv);
-
-            // Emit NOTE on success per requirement 10.1 and 16.5
-            messager.printMessage(Diagnostic.Kind.NOTE,
-                    "RawitAnnotationProcessor: processed " + enclosingClassName.replace('/', '.')
-                            + " — injected " + classTrees.size() + " overload group(s)");
         }
 
         return false;
+    }
+
+    // =========================================================================
+    // Post-generate injection (single-pass support)
+    // =========================================================================
+
+    /**
+     * Creates a {@link TaskListener} that injects bytecode into {@code .class} files after
+     * the GENERATE phase, enabling single-pass compilation.
+     *
+     * <p>The listener fires for every GENERATE event. For classes that have pending injections
+     * registered during annotation processing, it resolves the written {@code .class} file and
+     * delegates to {@link BytecodeInjector} or {@link GetterBytecodeInjector}.
+     */
+    private TaskListener createPostGenerateListener() {
+        return new TaskListener() {
+            @Override
+            public void finished(final TaskEvent e) {
+                if (e.getKind() != TaskEvent.Kind.GENERATE) return;
+                final TypeElement typeElement = e.getTypeElement();
+                if (typeElement == null) return;
+
+                final String binaryName = toBinaryName(typeElement);
+                final Optional<Path> classFilePath =
+                        overloadResolver.resolve(binaryName, processingEnv);
+
+                // Process getter injections
+                final List<AnnotatedField> fields = pendingGetterInjections.remove(binaryName);
+                if (fields != null && classFilePath.isPresent()) {
+                    getterBytecodeInjector.inject(classFilePath.get(), fields, processingEnv);
+                }
+
+                // Process invoker/constructor injections
+                final List<MergeTree> trees = pendingInvokerInjections.remove(binaryName);
+                if (trees != null && classFilePath.isPresent()) {
+                    bytecodeInjector.inject(classFilePath.get(), trees, processingEnv);
+                    messager.printMessage(Diagnostic.Kind.NOTE,
+                            "RawitAnnotationProcessor: processed " + binaryName.replace('/', '.')
+                                    + " — injected " + trees.size() + " overload group(s)");
+                }
+            }
+        };
     }
 
     // =========================================================================

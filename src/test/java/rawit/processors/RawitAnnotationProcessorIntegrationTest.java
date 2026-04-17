@@ -180,6 +180,26 @@ class RawitAnnotationProcessorIntegrationTest {
     }
 
     /**
+     * Compiles {@code source} with the annotation processor in a <em>single pass</em> and
+     * returns a {@link URLClassLoader} rooted at {@code outputDir}.
+     *
+     * <p>The processor generates stage-interface source files during annotation processing.
+     * javac automatically compiles those generated sources in the same invocation.
+     * Bytecode injection is deferred to the GENERATE phase via the {@link com.sun.source.util.TaskListener}
+     * registered by the processor in {@code init()}, so no multi-pass setup is needed.
+     */
+    private static URLClassLoader compileSinglePassAndLoad(final String className,
+                                                           final String source,
+                                                           final Path outputDir) throws Exception {
+        compile(className, source, outputDir,
+                List.of(new RawitAnnotationProcessor()),
+                List.of("-classpath", buildClasspath(outputDir)));
+        return new URLClassLoader(
+                new URL[]{outputDir.toUri().toURL()},
+                Thread.currentThread().getContextClassLoader());
+    }
+
+    /**
      * Invokes a method on an object using reflection, with {@code setAccessible(true)} to bypass
      * access checks on private accumulator classes.
      */
@@ -735,6 +755,129 @@ class RawitAnnotationProcessorIntegrationTest {
             assertInstanceOf(pairClass, pair, "result must be a Pair");
             assertEquals(30, pairClass.getField("a").get(pair), "a must be 30");
             assertEquals(40, pairClass.getField("b").get(pair), "b must be 40");
+        }
+    }
+
+    // =========================================================================
+    // Single-pass compilation tests — verify that bytecode injection works
+    // when the processor runs without any multi-pass configuration
+    // =========================================================================
+
+    @Test
+    void singlePass_instanceMethod_invokerChain(@TempDir final Path outputDir)
+            throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class SpAddInstance {\n" +
+                "    @Invoker\n" +
+                "    public int add(int x, int y) { return x + y; }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader =
+                     compileSinglePassAndLoad("testpkg.SpAddInstance", source, outputDir)) {
+            final Class<?> cls = loader.loadClass("testpkg.SpAddInstance");
+            final Object obj = cls.getDeclaredConstructor().newInstance();
+
+            final Object addStage = cls.getMethod("add").invoke(obj);
+            final Object xStage = invokeInt(addStage, "x", 3);
+            final Object invokeStage = invokeInt(xStage, "y", 4);
+            final Object result = invoke(invokeStage, "invoke");
+
+            assertEquals(7, result, "single-pass: add().x(3).y(4).invoke() must equal 7");
+
+            // Round-trip equivalence with direct invocation
+            final int direct = (int) cls.getMethod("add", int.class, int.class)
+                    .invoke(obj, 3, 4);
+            assertEquals(direct, result,
+                    "single-pass: chain result must equal direct invocation");
+        }
+    }
+
+    @Test
+    void singlePass_staticMethod_invokerChain(@TempDir final Path outputDir)
+            throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class SpAddStatic {\n" +
+                "    @Invoker\n" +
+                "    public static int add(int x, int y) { return x + y; }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader =
+                     compileSinglePassAndLoad("testpkg.SpAddStatic", source, outputDir)) {
+            final Class<?> cls = loader.loadClass("testpkg.SpAddStatic");
+
+            final Object addStage = cls.getMethod("add").invoke(null);
+            final Object xStage = invokeInt(addStage, "x", 5);
+            final Object invokeStage = invokeInt(xStage, "y", 6);
+            final Object result = invoke(invokeStage, "invoke");
+
+            assertEquals(11, result, "single-pass: static add().x(5).y(6).invoke() must equal 11");
+
+            // Round-trip equivalence with direct static invocation
+            final int direct = (int) cls.getMethod("add", int.class, int.class)
+                    .invoke(null, 5, 6);
+            assertEquals(direct, result,
+                    "single-pass: chain result must equal direct static invocation");
+        }
+    }
+
+    @Test
+    void singlePass_constructor_invokerChain(@TempDir final Path outputDir)
+            throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Constructor;\n" +
+                "public class SpPoint {\n" +
+                "    public final int x;\n" +
+                "    public final int y;\n" +
+                "    @Constructor\n" +
+                "    public SpPoint(int x, int y) { this.x = x; this.y = y; }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader =
+                     compileSinglePassAndLoad("testpkg.SpPoint", source, outputDir)) {
+            final Class<?> cls = loader.loadClass("testpkg.SpPoint");
+
+            final Object constructorStage = cls.getMethod("constructor").invoke(null);
+            final Object xStage = invokeInt(constructorStage, "x", 1);
+            final Object constructStage = invokeInt(xStage, "y", 2);
+            final Object point = invoke(constructStage, "construct");
+
+            assertNotNull(point);
+            assertInstanceOf(cls, point);
+            assertEquals(1, cls.getField("x").get(point), "single-pass: x must be 1");
+            assertEquals(2, cls.getField("y").get(point), "single-pass: y must be 2");
+        }
+    }
+
+    @Test
+    void singlePass_getter_injection(@TempDir final Path outputDir)
+            throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Getter;\n" +
+                "public class SpUser {\n" +
+                "    @Getter private String name;\n" +
+                "    @Getter private int age;\n" +
+                "    public SpUser(String name, int age) {\n" +
+                "        this.name = name;\n" +
+                "        this.age = age;\n" +
+                "    }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader =
+                     compileSinglePassAndLoad("testpkg.SpUser", source, outputDir)) {
+            final Class<?> cls = loader.loadClass("testpkg.SpUser");
+            final Object obj = cls.getDeclaredConstructor(String.class, int.class)
+                    .newInstance("Alice", 30);
+
+            assertEquals("Alice", cls.getMethod("getName").invoke(obj),
+                    "single-pass: getName() must return 'Alice'");
+            assertEquals(30, cls.getMethod("getAge").invoke(obj),
+                    "single-pass: getAge() must return 30");
         }
     }
 }

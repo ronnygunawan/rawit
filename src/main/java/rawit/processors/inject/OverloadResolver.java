@@ -31,6 +31,23 @@ public class OverloadResolver {
      * @return an {@link Optional} containing the path if the file exists, or empty otherwise
      */
     public Optional<Path> resolve(final String binaryClassName, final ProcessingEnvironment env) {
+        return resolvePath(binaryClassName, env).filter(Files::exists);
+    }
+
+    /**
+     * Resolves the target {@code .class} file path for the given binary class name, whether or
+     * not the file currently exists.
+     *
+     * <p>Unlike {@link #resolve}, this method does <em>not</em> check {@link Files#exists}.
+     * The returned path represents where the {@code .class} file will be written when
+     * compilation finishes, making it suitable for deferred (post-generate) injection.
+     *
+     * @param binaryClassName slash-separated binary class name, e.g. {@code "com/example/Foo"}
+     * @param env             the processing environment
+     * @return an {@link Optional} containing the path, or empty if the URI cannot be determined
+     *         or is not a {@code file:} URI
+     */
+    public Optional<Path> resolvePath(final String binaryClassName, final ProcessingEnvironment env) {
         // Use getResource to locate the .class file — no side effects, no probe files.
         try {
             final String packageName = toPackageName(binaryClassName);
@@ -43,12 +60,9 @@ public class OverloadResolver {
             if (!"file".equalsIgnoreCase(uri.getScheme())) {
                 return Optional.empty();
             }
-            final Path classFile = Paths.get(uri);
-            if (Files.exists(classFile)) {
-                return Optional.of(classFile);
-            }
+            return Optional.of(Paths.get(uri));
         } catch (final IOException | IllegalArgumentException e) {
-            // Fall through — file not found or URI not convertible
+            // Fall through — URI not convertible
         }
 
         return Optional.empty();

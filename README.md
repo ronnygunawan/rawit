@@ -35,6 +35,8 @@ foo.bar().x(10).y(20).invoke();
 
 ### 1. Add the dependency
 
+#### Maven
+
 ```xml
 <dependency>
     <groupId>io.github.ronnygunawan</groupId>
@@ -61,99 +63,10 @@ dependencies {
 }
 ```
 
-> **Gradle two-pass compile:** Rawit injects entry points into existing `.class` files, so the
-> declaring class must be compiled *before* annotation processing runs. Configure a three-pass
-> compile in your `build.gradle` / `build.gradle.kts`:
->
-> **Groovy DSL (`build.gradle`)**
-> ```groovy
-> // Pass 1: compile without annotation processing
-> compileJava {
->     options.compilerArgs += ['-proc:none']
-> }
->
-> // Pass 2: full compile — generates stage interfaces and compiles them
-> task processAnnotations(type: JavaCompile, dependsOn: compileJava) {
->     source = sourceSets.main.java
->     classpath = sourceSets.main.compileClasspath
->     destinationDirectory = sourceSets.main.java.classesDirectory
->     options.annotationProcessorPath = configurations.annotationProcessor
-> }
->
-> // Pass 3: re-inject bytecode overloads (overwritten by pass 2)
-> task reinjectBytecode(type: JavaCompile, dependsOn: processAnnotations) {
->     source = sourceSets.main.java
->     classpath = sourceSets.main.compileClasspath
->     destinationDirectory = sourceSets.main.java.classesDirectory
->     options.compilerArgs += ['-proc:only']
->     options.annotationProcessorPath = configurations.annotationProcessor
-> }
->
-> classes.dependsOn reinjectBytecode
-> ```
->
-> **Kotlin DSL (`build.gradle.kts`)**
-> ```kotlin
-> tasks.compileJava {
->     options.compilerArgs.add("-proc:none")
-> }
->
-> val processAnnotations by tasks.registering(JavaCompile::class) {
->     dependsOn(tasks.compileJava)
->     source = sourceSets.main.get().java
->     classpath = sourceSets.main.get().compileClasspath
->     destinationDirectory.set(sourceSets.main.get().java.classesDirectory)
->     options.annotationProcessorPath = configurations.annotationProcessor.get()
-> }
->
-> val reinjectBytecode by tasks.registering(JavaCompile::class) {
->     dependsOn(processAnnotations)
->     source = sourceSets.main.get().java
->     classpath = sourceSets.main.get().compileClasspath
->     destinationDirectory.set(sourceSets.main.get().java.classesDirectory)
->     options.annotationProcessorPath = configurations.annotationProcessor.get()
->     options.compilerArgs = listOf("-proc:only")
-> }
->
-> tasks.classes {
->     dependsOn(reinjectBytecode)
-> }
-> ```
-
-### 2. Annotate your methods
-
-> **Maven two-pass compile:** Rawit injects generated entry points into existing `.class` files,
-> which means the declaring class must be compiled *before* annotation processing runs. In a
-> standard single-pass Maven compile, annotation processing runs before `.class` files are written,
-> so injection is skipped silently on the first pass. To enable injection, configure a **three-pass
-> compile** in your `pom.xml` (Gradle users: see the Gradle setup above):
->
-> ```xml
-> <!-- Pass 1: compile sources without annotation processing -->
-> <plugin>
->   <groupId>org.apache.maven.plugins</groupId>
->   <artifactId>maven-compiler-plugin</artifactId>
->   <executions>
->     <execution>
->       <id>default-compile</id>
->       <configuration><compilerArgument>-proc:none</compilerArgument></configuration>
->     </execution>
->     <!-- Pass 2: full compile — generates stage interfaces and compiles them -->
->     <execution>
->       <id>process-annotations</id>
->       <phase>process-classes</phase>
->       <goals><goal>compile</goal></goals>
->     </execution>
->     <!-- Pass 3: re-inject bytecode overloads (overwritten by pass 2) -->
->     <execution>
->       <id>reinject-bytecode</id>
->       <phase>process-test-sources</phase>
->       <goals><goal>compile</goal></goals>
->       <configuration><compilerArgument>-proc:only</compilerArgument></configuration>
->     </execution>
->   </executions>
-> </plugin>
-> ```
+That's it! When using `javac`, no multi-pass compiler configuration is needed. Rawit hooks into
+javac's post-generate phase via a `TaskListener` and injects bytecode after each `.class` file is
+written. On non-`javac` compilers (for example, ECJ), this single-pass injection path is not
+guaranteed, so fallback behavior or additional compiler-specific configuration may be required.
 
 ```java
 import rawit.Invoker;
