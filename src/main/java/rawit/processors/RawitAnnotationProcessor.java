@@ -397,28 +397,22 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                 if (typeElement == null) return;
 
                 final String binaryName = toBinaryName(typeElement);
+                final Optional<Path> classFilePath =
+                        overloadResolver.resolve(binaryName, processingEnv);
 
                 // Process getter injections
                 final List<AnnotatedField> fields = pendingGetterInjections.remove(binaryName);
-                if (fields != null) {
-                    final Optional<Path> classFilePath =
-                            overloadResolver.resolve(binaryName, processingEnv);
-                    if (classFilePath.isPresent()) {
-                        getterBytecodeInjector.inject(classFilePath.get(), fields, processingEnv);
-                    }
+                if (fields != null && classFilePath.isPresent()) {
+                    getterBytecodeInjector.inject(classFilePath.get(), fields, processingEnv);
                 }
 
                 // Process invoker/constructor injections
                 final List<MergeTree> trees = pendingInvokerInjections.remove(binaryName);
-                if (trees != null) {
-                    final Optional<Path> classFilePath =
-                            overloadResolver.resolve(binaryName, processingEnv);
-                    if (classFilePath.isPresent()) {
-                        bytecodeInjector.inject(classFilePath.get(), trees, processingEnv);
-                        messager.printMessage(Diagnostic.Kind.NOTE,
-                                "RawitAnnotationProcessor: processed " + binaryName.replace('/', '.')
-                                        + " — injected " + trees.size() + " overload group(s)");
-                    }
+                if (trees != null && classFilePath.isPresent()) {
+                    bytecodeInjector.inject(classFilePath.get(), trees, processingEnv);
+                    messager.printMessage(Diagnostic.Kind.NOTE,
+                            "RawitAnnotationProcessor: processed " + binaryName.replace('/', '.')
+                                    + " — injected " + trees.size() + " overload group(s)");
                 }
             }
         };
