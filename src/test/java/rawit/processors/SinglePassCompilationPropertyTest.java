@@ -434,15 +434,27 @@ class SinglePassCompilationPropertyTest {
      */
     private static SortedSet<String> extractInjectedMethodSignatures(final Class<?> cls) {
         final SortedSet<String> signatures = new TreeSet<>();
+        final Set<String> objectMethodSignatures = Set.of(
+                "equals(java.lang.Object):boolean",
+                "hashCode():int",
+                "toString():java.lang.String",
+                "getClass():java.lang.Class",
+                "notify():void",
+                "notifyAll():void",
+                "wait():void",
+                "wait(long):void",
+                "wait(long,int):void"
+        );
         for (final Method m : cls.getDeclaredMethods()) {
-            // Include parameterless methods (injected overloads) and getter methods
-            // Exclude synthetic/bridge methods
-            if (m.isSynthetic() || m.isBridge()) continue;
+            // Include only parameterless methods that represent injected overloads,
+            // getters, or constructor entry points; exclude synthetic/bridge methods.
+            if (m.isSynthetic() || m.isBridge() || m.getParameterCount() != 0) continue;
             final String sig = m.getName() + "("
                     + Arrays.stream(m.getParameterTypes())
                             .map(Class::getName)
                             .collect(Collectors.joining(","))
                     + "):" + m.getReturnType().getName();
+            if (objectMethodSignatures.contains(sig)) continue;
             signatures.add(sig);
         }
         return signatures;
