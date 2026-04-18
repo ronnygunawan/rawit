@@ -176,46 +176,73 @@ class AstEntryPointInjectorTest {
         final AstEntryPointInjector[] captured = {null};
 
         final javax.annotation.processing.AbstractProcessor capturingProcessor =
-                new javax.annotation.processing.AbstractProcessor() {
-            @Override
-            public java.util.Set<String> getSupportedAnnotationTypes() {
-                return java.util.Set.of("*");
-            }
-            @Override
-            public javax.lang.model.SourceVersion getSupportedSourceVersion() {
-                return javax.lang.model.SourceVersion.latestSupported();
-            }
-            @Override
-            public synchronized void init(final ProcessingEnvironment env) {
-                super.init(env);
-                captured[0] = AstEntryPointInjector.tryCreate(env);
-            }
-            @Override
-            public boolean process(final java.util.Set<? extends javax.lang.model.element.TypeElement> a,
-                                   final javax.annotation.processing.RoundEnvironment r) {
-                return false;
-            }
-        };
+                new CapturingProcessor(captured);
 
         final DiagnosticCollector<JavaFileObject> diag = new DiagnosticCollector<>();
         try (final StandardJavaFileManager fm =
                      compiler.getStandardFileManager(diag, null, null)) {
 
-            final JavaFileObject src = new SimpleJavaFileObject(
-                    URI.create("string:///Dummy.java"), JavaFileObject.Kind.SOURCE) {
-                @Override
-                public CharSequence getCharContent(final boolean ignoreEncodingErrors) {
-                    return "class Dummy {}";
-                }
-            };
-
             final JavaCompiler.CompilationTask task = compiler.getTask(
-                    null, fm, diag, List.of(), null, List.of(src));
+                    null, fm, diag, List.of(), null, List.of(dummySource()));
             task.setProcessors(List.of(capturingProcessor));
             task.call();
         }
 
         assertNotNull(captured[0],
                 "AstEntryPointInjector.tryCreate() should return non-null under javac");
+    }
+
+    // =========================================================================
+    // Helpers for tryCreate test
+    // =========================================================================
+
+    /**
+     * Returns an in-memory {@link JavaFileObject} for a trivial {@code class Dummy {}}.
+     */
+    private static JavaFileObject dummySource() {
+        return new SimpleJavaFileObject(
+                URI.create("string:///Dummy.java"), JavaFileObject.Kind.SOURCE) {
+            @Override
+            public CharSequence getCharContent(final boolean ignoreEncodingErrors) {
+                return "class Dummy {}";
+            }
+        };
+    }
+
+    /**
+     * Annotation processor that captures the result of
+     * {@link AstEntryPointInjector#tryCreate} in its {@code init()} method.
+     */
+    private static final class CapturingProcessor
+            extends javax.annotation.processing.AbstractProcessor {
+
+        private final AstEntryPointInjector[] sink;
+
+        CapturingProcessor(final AstEntryPointInjector[] sink) {
+            this.sink = sink;
+        }
+
+        @Override
+        public java.util.Set<String> getSupportedAnnotationTypes() {
+            return java.util.Set.of("*");
+        }
+
+        @Override
+        public javax.lang.model.SourceVersion getSupportedSourceVersion() {
+            return javax.lang.model.SourceVersion.latestSupported();
+        }
+
+        @Override
+        public synchronized void init(final ProcessingEnvironment env) {
+            super.init(env);
+            sink[0] = AstEntryPointInjector.tryCreate(env);
+        }
+
+        @Override
+        public boolean process(
+                final java.util.Set<? extends javax.lang.model.element.TypeElement> a,
+                final javax.annotation.processing.RoundEnvironment r) {
+            return false;
+        }
     }
 }

@@ -210,6 +210,10 @@ public final class AstEntryPointInjector {
                     tmReturn, tmBlock, tmMethodDef)) {
                 return null;
             }
+            // tmTypeIdent and tmTypeArray are optional: they are only used by
+            // buildTypeFromDescriptor() for getter return-type expressions. If either
+            // is null (unlikely on standard JDKs), the getter AST injection silently
+            // skips primitive and array types while still injecting for reference types.
 
             return new AstEntryPointInjector(
                     trees, treeMaker, names,
@@ -424,6 +428,11 @@ public final class AstEntryPointInjector {
     /** Builds {@code TreeMaker.TypeIdent(TypeTag.<tagName>)}. */
     private Object primitiveType(final String tagName) throws Exception {
         if (tmTypeIdent == null || typeTagClass == null) return null;
+        // Safe: typeTagClass IS an enum class (com.sun.tools.javac.code.TypeTag).
+        // Enum.valueOf requires a raw Class<Enum> parameter; the unchecked cast is
+        // unavoidable here because typeTagClass was obtained via Class.forName() and
+        // therefore has type Class<?>.  The call is correct at runtime because
+        // typeTagClass is always the TypeTag enum class.
         @SuppressWarnings({"unchecked", "rawtypes"})
         final Enum<?> tag = Enum.valueOf((Class<Enum>) typeTagClass, tagName);
         return tmTypeIdent.invoke(treeMaker, tag);
