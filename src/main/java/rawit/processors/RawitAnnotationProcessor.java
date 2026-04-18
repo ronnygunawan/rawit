@@ -604,15 +604,29 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
      * Extracts fully qualified names of tag annotations (annotations meta-annotated with
      * {@link rawit.TaggedValue @TaggedValue}) from the given element.
      *
+     * <p>Uses mirror-based inspection rather than {@link Element#getAnnotation(Class)}
+     * because {@code @TaggedValue} has {@code RetentionPolicy.CLASS}, and
+     * {@code getAnnotation()} only works reliably for {@code RUNTIME}-retained annotations
+     * when the annotation type comes from a pre-compiled JAR.
+     *
      * @param element the element whose annotations to inspect
      * @return list of FQNs of tag annotations found on the element (empty if none)
      */
     private List<String> extractTagAnnotationFqns(final Element element) {
+        final String taggedValueFqn = rawit.TaggedValue.class.getCanonicalName();
         final List<String> fqns = new ArrayList<>();
         for (final AnnotationMirror mirror : element.getAnnotationMirrors()) {
             final Element annotationType = mirror.getAnnotationType().asElement();
-            if (annotationType.getAnnotation(rawit.TaggedValue.class) != null) {
-                fqns.add(((TypeElement) annotationType).getQualifiedName().toString());
+            if (annotationType instanceof TypeElement typeElement) {
+                // Check if this annotation type is itself meta-annotated with @TaggedValue
+                for (final AnnotationMirror meta : typeElement.getAnnotationMirrors()) {
+                    final Element metaType = meta.getAnnotationType().asElement();
+                    if (metaType instanceof TypeElement metaTypeElement
+                            && metaTypeElement.getQualifiedName().contentEquals(taggedValueFqn)) {
+                        fqns.add(typeElement.getQualifiedName().toString());
+                        break;
+                    }
+                }
             }
         }
         return fqns;
