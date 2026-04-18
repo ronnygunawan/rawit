@@ -107,7 +107,7 @@ class SampleTaggedValueDemoPropertyTest {
 
     /**
      * For each build configuration file (pom.xml, build.gradle), the file must
-     * contain the version string {@code 1.1.0-rc-1} and must not reference
+     * contain the version string {@code 1.1.0} and must not reference
      * {@code 1.0.0} as a rawit dependency version.
      *
      * <p><b>Validates: Requirements 1.1, 1.2</b>
@@ -118,8 +118,8 @@ class SampleTaggedValueDemoPropertyTest {
     ) throws IOException {
         String content = Files.readString(buildFile);
 
-        assertTrue(content.contains("1.1.0-rc-1"),
-                buildFile.getFileName() + " must contain version 1.1.0-rc-1");
+        assertTrue(content.contains("1.1.0"),
+                buildFile.getFileName() + " must contain version 1.1.0");
 
         // Check that 1.0.0 does not appear as a rawit dependency version.
         // For pom.xml: look for rawit artifactId near 1.0.0
