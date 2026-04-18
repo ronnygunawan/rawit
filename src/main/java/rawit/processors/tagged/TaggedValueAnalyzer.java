@@ -226,8 +226,11 @@ public final class TaggedValueAnalyzer {
                         final boolean isLiteralOrConst = isLiteralOrConstant(expression, contextPath);
                         final Optional<AssignmentWarning> warning =
                                 assignmentChecker.check(sourceTag, returnTag, isLiteralOrConst);
-                        warning.ifPresent(w -> messager.printMessage(
-                                Diagnostic.Kind.WARNING, w.toMessage(), enclosingMethod));
+                        warning.ifPresent(w -> trees.printMessage(
+                                Diagnostic.Kind.WARNING,
+                                w.toMessage(),
+                                contextNode,
+                                contextPath.getCompilationUnit()));
                     } catch (final NullPointerException | IllegalArgumentException ignored) {
                         // Unresolvable elements — skip
                     }
@@ -334,23 +337,42 @@ public final class TaggedValueAnalyzer {
 
             /**
              * Resolves the tag for a method's return value by inspecting
-             * annotations on the method's return type.
+             * annotations on the method's return type, with lazy discovery
+             * and duplicate-tag handling.
              */
             private TagResolution resolveMethodReturnTag(
                     final ExecutableElement method
             ) {
-                // Check annotations on the return type (type-use annotations)
                 final List<? extends javax.lang.model.element.AnnotationMirror> returnAnnotations =
                         method.getReturnType().getAnnotationMirrors();
+                TagResolution.Tagged firstTag = null;
                 for (final javax.lang.model.element.AnnotationMirror mirror : returnAnnotations) {
                     final Element annotationElement = mirror.getAnnotationType().asElement();
                     if (annotationElement instanceof TypeElement typeElement) {
                         final String fqn = typeElement.getQualifiedName().toString();
-                        final TagInfo info = tagMap.get(fqn);
+                        TagInfo info = tagMap.get(fqn);
+                        if (info == null) {
+                            // Lazy discovery via TagResolver's mechanism
+                            final TagResolution resolved = tagResolver.resolve(typeElement, tagMap, messager);
+                            if (resolved instanceof TagResolution.Tagged tagged) {
+                                info = tagged.tag();
+                            }
+                        }
                         if (info != null) {
-                            return new TagResolution.Tagged(info);
+                            if (firstTag != null) {
+                                messager.printMessage(
+                                        Diagnostic.Kind.WARNING,
+                                        "multiple tag annotations on return type; using first encountered",
+                                        method
+                                );
+                                return firstTag;
+                            }
+                            firstTag = new TagResolution.Tagged(info);
                         }
                     }
+                }
+                if (firstTag != null) {
+                    return firstTag;
                 }
                 // Fall back to annotations on the method element itself
                 return tagResolver.resolve(method, tagMap, messager);

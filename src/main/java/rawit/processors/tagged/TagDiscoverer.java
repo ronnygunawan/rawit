@@ -27,16 +27,9 @@ public final class TagDiscoverer {
      * Scans the round environment for annotation types annotated with
      * {@code @TaggedValue} and builds a tag info map.
      *
-     * <p>Discovery works in two passes:
-     * <ol>
-     *   <li>Direct: finds annotation types annotated with {@code @TaggedValue}
-     *       that are being compiled in the current round.</li>
-     *   <li>Indirect: scans annotations on all root elements in the round and
-     *       checks whether any of those annotation types carry {@code @TaggedValue}.
-     *       This catches tag annotations that come from pre-compiled JARs on the
-     *       classpath (where the tag annotation declaration is not in the current
-     *       round but its usages are).</li>
-     * </ol>
+     * <p>Only discovers tag annotations that are being compiled in the current
+     * round. Tag annotations from pre-compiled JARs are discovered lazily by
+     * {@link TagResolver} during analysis when it encounters unknown annotations.
      *
      * @param roundEnv      the current round environment
      * @param processingEnv the processing environment
@@ -48,7 +41,6 @@ public final class TagDiscoverer {
     ) {
         final Map<String, TagInfo> tagMap = new LinkedHashMap<>();
 
-        // Pass 1: Direct discovery — tag annotations compiled in this round
         for (final Element element : roundEnv.getElementsAnnotatedWith(TaggedValue.class)) {
             if (!(element instanceof TypeElement typeElement)) {
                 continue;
@@ -59,53 +51,7 @@ public final class TagDiscoverer {
             tagMap.put(fqn, new TagInfo(fqn, strict));
         }
 
-        // Pass 2: Indirect discovery — scan annotations on root elements to find
-        // tag annotations from pre-compiled JARs on the classpath
-        for (final Element rootElement : roundEnv.getRootElements()) {
-            discoverFromElementAnnotations(rootElement, tagMap, processingEnv);
-        }
-
         return tagMap;
-    }
-
-    /**
-     * Recursively inspects annotations on an element (and its enclosed elements)
-     * to discover tag annotations from the classpath.
-     */
-    private void discoverFromElementAnnotations(
-            final Element element,
-            final Map<String, TagInfo> tagMap,
-            final ProcessingEnvironment processingEnv
-    ) {
-        for (final AnnotationMirror mirror : element.getAnnotationMirrors()) {
-            final Element annotationElement = mirror.getAnnotationType().asElement();
-            if (annotationElement instanceof TypeElement annotationType) {
-                final String fqn = annotationType.getQualifiedName().toString();
-                if (!tagMap.containsKey(fqn) && hasTaggedValueAnnotation(annotationType)) {
-                    final boolean strict = extractStrictAttribute(annotationType, processingEnv);
-                    tagMap.put(fqn, new TagInfo(fqn, strict));
-                }
-            }
-        }
-
-        for (final Element enclosed : element.getEnclosedElements()) {
-            discoverFromElementAnnotations(enclosed, tagMap, processingEnv);
-        }
-    }
-
-    /**
-     * Checks whether a type element carries the {@code @TaggedValue} annotation.
-     */
-    private static boolean hasTaggedValueAnnotation(final TypeElement typeElement) {
-        final String taggedValueFqn = TaggedValue.class.getCanonicalName();
-        for (final AnnotationMirror mirror : typeElement.getAnnotationMirrors()) {
-            final Element annotationType = mirror.getAnnotationType().asElement();
-            if (annotationType instanceof TypeElement te
-                    && te.getQualifiedName().contentEquals(taggedValueFqn)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
