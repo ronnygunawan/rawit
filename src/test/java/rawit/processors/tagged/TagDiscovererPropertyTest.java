@@ -129,7 +129,8 @@ class TagDiscovererPropertyTest {
 
     /**
      * Creates a stub {@link RoundEnvironment} that returns the given elements
-     * when {@code getElementsAnnotatedWith(TaggedValue.class)} is called.
+     * when {@code getElementsAnnotatedWith(TaggedValue.class)} is called,
+     * and an empty set for {@code getRootElements()}.
      */
     @SuppressWarnings("unchecked")
     private static RoundEnvironment createRoundEnvironmentStub(Set<TypeElement> elements) {
@@ -141,6 +142,9 @@ class TagDiscovererPropertyTest {
                             && args != null && args.length == 1 && args[0] instanceof Class<?> cls
                             && cls == TaggedValue.class) {
                         return (Set<Element>) (Set<?>) elements;
+                    }
+                    if ("getRootElements".equals(method.getName())) {
+                        return Set.of();
                     }
                     throw new UnsupportedOperationException(
                             "Stub RoundEnvironment does not support: " + method.getName());

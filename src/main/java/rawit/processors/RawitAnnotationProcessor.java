@@ -117,8 +117,11 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
 
     @Override
     public final Set<String> getSupportedAnnotationTypes() {
-        return Set.of(INVOKER_ANNOTATION_FQN, CONSTRUCTOR_ANNOTATION_FQN, GETTER_ANNOTATION_FQN,
-                TAGGED_VALUE_ANNOTATION_FQN);
+        // Use "*" so the processor is invoked even when only user-defined tag
+        // annotations (meta-annotated with @TaggedValue) are present in source.
+        // Without this, downstream projects that consume tag annotations from a
+        // library JAR would never trigger the TaggedValueAnalyzer.
+        return Set.of("*");
     }
 
     @Override
@@ -129,18 +132,21 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     @Override
     public final boolean process(final Set<? extends TypeElement> annotations,
                                  final RoundEnvironment roundEnv) {
-        if (annotations.isEmpty()) {
-            return false;
-        }
-
         final boolean debug = isDebugEnabled();
 
         // --- @TaggedValue processing ---
+        // Runs unconditionally: tag annotations may come from pre-compiled JARs,
+        // so the annotations set may not contain rawit.TaggedValue even when tag
+        // usages are present in source.
         final TagDiscoverer tagDiscoverer = new TagDiscoverer();
         final Map<String, TagInfo> tagMap = tagDiscoverer.discover(roundEnv, processingEnv);
         if (!tagMap.isEmpty()) {
             final TaggedValueAnalyzer taggedValueAnalyzer = new TaggedValueAnalyzer();
             taggedValueAnalyzer.analyzeRound(tagMap, roundEnv, processingEnv);
+        }
+
+        if (annotations.isEmpty()) {
+            return false;
         }
 
         // --- @Getter processing ---
