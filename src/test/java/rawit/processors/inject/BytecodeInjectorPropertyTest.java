@@ -212,7 +212,7 @@ class BytecodeInjectorPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 2: Parameterless overload is injected
-    // Feature: project-rawit-curry, Property 2: Parameterless overload is injected
+    // Feature: project-rawit-invoker, Property 2: Parameterless overload is injected
     // -------------------------------------------------------------------------
 
     @Property(tries = 5)
@@ -250,7 +250,7 @@ class BytecodeInjectorPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 3: Parameterless overload preserves access modifier
-    // Feature: project-rawit-curry, Property 3: Parameterless overload preserves access modifier
+    // Feature: project-rawit-invoker, Property 3: Parameterless overload preserves access modifier
     // -------------------------------------------------------------------------
 
     @Property(tries = 5)
@@ -300,7 +300,7 @@ class BytecodeInjectorPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 4: Parameterless overload returns the Entry_Stage type
-    // Feature: project-rawit-curry, Property 4: Parameterless overload returns the Entry_Stage type
+    // Feature: project-rawit-invoker, Property 4: Parameterless overload returns the Entry_Stage type
     // -------------------------------------------------------------------------
 
     @Property(tries = 5)
@@ -342,7 +342,7 @@ class BytecodeInjectorPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 17: Generated .class files load without VerifyError
-    // Feature: project-rawit-curry, Property 17: Generated .class files load without VerifyError
+    // Feature: project-rawit-invoker, Property 17: Generated .class files load without VerifyError
     // -------------------------------------------------------------------------
 
     @Property(tries = 5)
@@ -386,7 +386,7 @@ class BytecodeInjectorPropertyTest {
 
     // -------------------------------------------------------------------------
     // Property 19: Injection idempotency — re-running the injector is a no-op
-    // Feature: project-rawit-curry, Property 19: Injection idempotency — re-running the injector is a no-op
+    // Feature: project-rawit-invoker, Property 19: Injection idempotency — re-running the injector is a no-op
     // -------------------------------------------------------------------------
 
     @Property(tries = 5)

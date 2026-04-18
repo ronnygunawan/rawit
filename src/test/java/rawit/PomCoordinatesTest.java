@@ -75,14 +75,6 @@ class PomCoordinatesTest {
         assertTrue(description.contains("@Constructor"), "description must contain @Constructor");
     }
 
-    // Validates: Requirement 2.1
-    @Test
-    void descriptionDoesNotMentionCurry() {
-        String description = topLevelText("description");
-        assertNotNull(description, "description element must be present");
-        assertFalse(description.contains("@Curry"), "description must not contain @Curry");
-    }
-
     // Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5
     @Test
     void requiredTopLevelMetadataElementsArePresent() {

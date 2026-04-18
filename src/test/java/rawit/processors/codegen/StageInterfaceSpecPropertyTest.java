@@ -199,9 +199,7 @@ class StageInterfaceSpecPropertyTest {
 
         for (TypeSpec iface : specs) {
             assertTrue(iface.name.endsWith("StageInvoker"),
-                    "stage interface '" + iface.name + "' must end with 'StageInvoker', not 'StageCaller'");
-            assertFalse(iface.name.endsWith("StageCaller"),
-                    "stage interface '" + iface.name + "' must not end with 'StageCaller'");
+                    "stage interface '" + iface.name + "' must end with 'StageInvoker'");
         }
     }
 

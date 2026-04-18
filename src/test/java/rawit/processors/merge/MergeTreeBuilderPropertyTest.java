@@ -115,7 +115,7 @@ class MergeTreeBuilderPropertyTest {
     // -------------------------------------------------------------------------
     // Property 21: Shared prefix is correctly computed for overload groups
     // -------------------------------------------------------------------------
-    // Feature: project-rawit-curry, Property 21: Shared prefix is correctly computed for overload groups
+    // Feature: project-rawit-invoker, Property 21: Shared prefix is correctly computed for overload groups
 
     @Property(tries = 100)
     void property21_sharedPrefixIsCorrectlyComputed(
@@ -157,7 +157,7 @@ class MergeTreeBuilderPropertyTest {
     // -------------------------------------------------------------------------
     // Property 22: Single parameterless overload for an overload group
     // -------------------------------------------------------------------------
-    // Feature: project-rawit-curry, Property 22: Single parameterless overload for an overload group
+    // Feature: project-rawit-invoker, Property 22: Single parameterless overload for an overload group
 
     @Property(tries = 100)
     void property22_singleOverload_treeHasExactlyOneTerminal(
@@ -178,7 +178,7 @@ class MergeTreeBuilderPropertyTest {
     // -------------------------------------------------------------------------
     // Property 23: Branching stage is generated at divergence points
     // -------------------------------------------------------------------------
-    // Feature: project-rawit-curry, Property 23: Branching stage is generated at divergence points
+    // Feature: project-rawit-invoker, Property 23: Branching stage is generated at divergence points
 
     @Property(tries = 100)
     void property23_divergingFirstParam_producesBranchingNode(
@@ -239,7 +239,7 @@ class MergeTreeBuilderPropertyTest {
     // -------------------------------------------------------------------------
     // Property 24: Prefix overload stage exposes both terminal and continuation
     // -------------------------------------------------------------------------
-    // Feature: project-rawit-curry, Property 24: Prefix overload stage exposes both terminal and continuation
+    // Feature: project-rawit-invoker, Property 24: Prefix overload stage exposes both terminal and continuation
 
     @Property(tries = 100)
     void property24_prefixOverload_terminalNodeHasContinuation(
