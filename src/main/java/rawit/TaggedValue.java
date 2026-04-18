@@ -24,7 +24,7 @@ import java.lang.annotation.Target;
  * public &#64;interface FirstName { }
  * </pre>
  *
- * @see <a href="https://github.com/rawit">rawit documentation</a>
+ * @see <a href="https://github.com/projectrawit/rawit">rawit documentation</a>
  */
 @Target(ElementType.ANNOTATION_TYPE)
 @Retention(RetentionPolicy.CLASS)

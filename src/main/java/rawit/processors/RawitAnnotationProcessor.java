@@ -69,6 +69,8 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     private final java.util.Set<java.net.URI> analyzedTaggedValueUnits = new java.util.HashSet<>();
     /** Cached tag map discovered across rounds (avoids re-scanning enclosed elements). */
     private final Map<String, TagInfo> cachedTagMap = new LinkedHashMap<>();
+    /** Annotation FQNs known not to be tag annotations (negative lookup cache). */
+    private final java.util.Set<String> notTagAnnotations = new java.util.HashSet<>();
     /**
      * {@code true} when a {@link TaskListener} was successfully registered on the underlying
      * {@link JavacTask}, enabling single-pass deferred injection.
@@ -145,13 +147,14 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
         cachedTagMap.putAll(roundTagMap);
 
         // Also scan the annotations set for tag annotations from dependency JARs.
-        // When tag annotations come from pre-compiled JARs, TagDiscoverer won't find them
-        // (they're not compiled in this round), but they appear in the annotations set.
+        // Skip annotations already known to be tags or known not to be tags.
         for (final TypeElement annotation : annotations) {
             final String fqn = annotation.getQualifiedName().toString();
-            if (!cachedTagMap.containsKey(fqn)) {
+            if (!cachedTagMap.containsKey(fqn) && !notTagAnnotations.contains(fqn)) {
                 final TagInfo discovered = TagResolver.lazyDiscover(annotation, cachedTagMap);
-                // lazyDiscover adds to cachedTagMap if found
+                if (discovered == null) {
+                    notTagAnnotations.add(fqn);
+                }
             }
         }
 

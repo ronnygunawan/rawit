@@ -36,7 +36,8 @@ import java.util.Optional;
  *   <li>Emits the warning via {@code Messager} if applicable</li>
  * </ol>
  *
- * <p>This class is stateless — no initialization is needed.
+ * <p>This class is lightweight and reusable. It maintains internal caches
+ * to deduplicate warnings but requires no external initialization.
  *
  * <p>Graceful degradation: if the Tree API is unavailable (e.g. running under
  * ECJ), analysis is silently skipped.
