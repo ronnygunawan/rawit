@@ -58,6 +58,19 @@
                 <version>3.5.2</version>
                 <configuration>
                     <useModulePath>false</useModulePath>
+                    <!-- Allow the AstEntryPointInjector (and integration tests that exercise it)
+                         to access javac-internal packages via reflection.  These opens are
+                         required only in the test JVM; production use of the annotation
+                         processor also benefits from them being added to the user's build
+                         tool configuration (see README for details). -->
+                    <argLine>
+                        --add-opens jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED
+                        --add-opens jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+                        --add-opens jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+                        --add-opens jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED
+                        --add-opens jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+                        ${argLine}
+                    </argLine>
                 </configuration>
             </plugin>
             <plugin>

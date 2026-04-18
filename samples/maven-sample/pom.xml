@@ -34,6 +34,28 @@
                 <version>3.13.0</version>
                 <configuration>
                     <release>17</release>
+                    <!-- Declare Rawit as an annotation processor so that IDEs (IntelliJ IDEA,
+                         Eclipse) auto-detect it and enable annotation processing without
+                         requiring manual configuration. -->
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>io.github.projectrawit</groupId>
+                            <artifactId>rawit</artifactId>
+                            <version>1.1.0</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <!-- Pass --add-opens to the javac JVM (via the -J prefix) so that Rawit
+                         can inject entry-point method stubs into the original class's javac AST.
+                         This makes calc.add(), Point.constructor() etc. visible to IntelliSense
+                         without a prior full recompile.  Rawit falls back gracefully if these
+                         flags are absent; the of() factory on the generated class always works. -->
+                    <compilerArgs>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
             <plugin>

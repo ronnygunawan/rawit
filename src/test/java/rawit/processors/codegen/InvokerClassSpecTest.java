@@ -201,8 +201,42 @@ class InvokerClassSpecTest {
     }
 
     // -------------------------------------------------------------------------
-    // Checked exceptions
+    // of() factory method — IDE-friendly entry point (Issue: IntelliSense support)
     // -------------------------------------------------------------------------
+
+    @Test
+    void instanceMethod_hasStaticOfFactoryWithInstanceParam() {
+        AnnotatedMethod m = instanceMethod("bar", "V", List.of(), p("x", "I"));
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
+        String source = toSource(spec);
+        assertTrue(source.contains("public static FooBarInvoker of(Foo instance)"),
+                "instance-method invoker must expose static of(Foo instance) factory");
+        assertTrue(source.contains("return new FooBarInvoker(instance)"),
+                "of() factory must delegate to the public constructor");
+    }
+
+    @Test
+    void staticMethod_hasStaticNoArgOfFactory() {
+        AnnotatedMethod m = staticMethod("bar", "V", p("x", "I"));
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
+        String source = toSource(spec);
+        assertTrue(source.contains("public static FooBarInvoker of()"),
+                "static-method invoker must expose a no-arg of() factory");
+        assertTrue(source.contains("return new FooBarInvoker()"),
+                "of() factory must delegate to the public no-arg constructor");
+    }
+
+    @Test
+    void constructorAnnotation_hasStaticNoArgOfFactory() {
+        AnnotatedMethod m = constructorMethod(p("id", "I"));
+        TypeSpec spec = new InvokerClassSpec(linearTree(m)).build();
+        String source = toSource(spec);
+        assertTrue(source.contains("public static FooConstructor of()"),
+                "@Constructor invoker must expose a no-arg of() factory");
+        assertTrue(source.contains("return new FooConstructor()"),
+                "of() factory must delegate to the public no-arg constructor");
+    }
+
 
     @Test
     void checkedExceptionsPropagatedToStageMethods() {

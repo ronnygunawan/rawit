@@ -3,6 +3,7 @@ package rawit.processors;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
+import rawit.processors.ast.AstEntryPointInjector;
 import rawit.processors.codegen.JavaPoetGenerator;
 import rawit.processors.getter.GetterCollisionDetector;
 import rawit.processors.getter.GetterNameResolver;
@@ -86,6 +87,12 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     private GetterNameResolver getterNameResolver;
     private GetterCollisionDetector getterCollisionDetector;
     private GetterBytecodeInjector getterBytecodeInjector;
+    /**
+     * Best-effort AST injector that adds entry-point method stubs into the
+     * original class's javac AST so that IntelliSense resolves them during
+     * source-level analysis.  {@code null} when not running under javac.
+     */
+    private AstEntryPointInjector astEntryPointInjector;
 
     @Override
     public final synchronized void init(final ProcessingEnvironment processingEnv) {
@@ -119,6 +126,13 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                                 + ". Multi-pass compile required.");
             }
         }
+
+        // Try to create the AST entry-point injector (javac-only, best-effort).
+        // This adds method stubs to the original class's javac AST so that
+        // IntelliSense can resolve them during source analysis without a prior
+        // full recompile.  Returns null on non-javac compilers or on any
+        // reflection failure — no correctness impact either way.
+        this.astEntryPointInjector = AstEntryPointInjector.tryCreate(processingEnv);
     }
 
     @Override
@@ -229,6 +243,14 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                     processingEnv.getTypeUtils());
 
             validGetterFields.addAll(passed);
+
+            // AST injection — adds getter stubs to the class's javac AST so that
+            // IntelliSense resolves them from source analysis (best-effort, javac only).
+            if (astEntryPointInjector != null) {
+                for (final AnnotatedField field : passed) {
+                    astEntryPointInjector.injectGetterMethod(enclosingClass, field);
+                }
+            }
         }
 
         // Step 4: Group valid fields by enclosing class and inject
@@ -379,6 +401,23 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                     "[invoker.debug] Generating source files for " + allTrees.size() + " tree(s)");
         }
         javaPoetGenerator.generate(allTrees, processingEnv);
+
+        // --- Stage 4b: AST entry-point injection (javac only, best-effort) ---
+        // Adds the parameterless entry-point method stubs to the original class's
+        // javac AST so that IntelliSense can resolve calc.add() / Point.constructor()
+        // during source analysis without requiring a prior recompile.
+        // Falls back silently when astEntryPointInjector is null (non-javac) or when
+        // the AST is not yet available (e.g. -proc:only mode).
+        if (astEntryPointInjector != null) {
+            for (final MergeTree tree : allTrees) {
+                final String dotName = tree.group().enclosingClassName().replace('/', '.');
+                final javax.lang.model.element.TypeElement te =
+                        processingEnv.getElementUtils().getTypeElement(dotName);
+                if (te != null) {
+                    astEntryPointInjector.injectInvokerEntryPoint(te, tree);
+                }
+            }
+        }
 
         // --- Stage 5: Inject parameterless overloads via ASM, once per enclosing class ---
         // When a TaskListener is registered (javac), injection is deferred until after the

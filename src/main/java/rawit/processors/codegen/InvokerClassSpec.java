@@ -73,9 +73,25 @@ public class InvokerClassSpec {
                     .addParameter(enclosingType, "instance")
                     .addStatement("this.__instance = instance")
                     .build());
+            // IDE-friendly static factory: an alternative to the bytecode-injected
+            // zero-argument overload on the enclosing class.  Using this method in
+            // source code allows IntelliSense to resolve the full stage-interface
+            // chain without needing a prior full recompile.
+            classBuilder.addMethod(MethodSpec.methodBuilder("of")
+                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                    .returns(ClassName.bestGuess(callerClassName))
+                    .addParameter(enclosingType, "instance")
+                    .addStatement("return new $L(instance)", callerClassName)
+                    .build());
         } else {
             classBuilder.addMethod(MethodSpec.constructorBuilder()
                     .addModifiers(Modifier.PUBLIC)
+                    .build());
+            // IDE-friendly static factory (no-arg variant for static methods / @Constructor).
+            classBuilder.addMethod(MethodSpec.methodBuilder("of")
+                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                    .returns(ClassName.bestGuess(callerClassName))
+                    .addStatement("return new $L()", callerClassName)
                     .build());
         }
 

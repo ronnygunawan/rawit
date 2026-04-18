@@ -366,7 +366,120 @@ Rawit catches mistakes early. You'll get a clear `javac` error for:
 
 ---
 
-## 🛠️ Building from Source
+## 💡 IDE / IntelliSense Setup
+
+Rawit's annotation processor generates source files (e.g. `CalculatorAddInvoker.java`) and
+injects methods directly into `.class` files at compile time. Getting full IntelliSense
+(auto-complete for both the generated builder chain **and** the entry-point method on the
+original class) requires a few extra steps depending on your IDE and build tool.
+
+### Entry-point methods
+
+Every generated Invoker/Constructor class ships a static **`of()`** factory method that mirrors
+the bytecode-injected entry point on the original class.  Using `of()` is the recommended way
+to start a chain when you need IntelliSense before the first full build:
+
+```java
+// Bytecode-injected entry point (available after a full build):
+int result = calc.add().x(3).y(4).invoke();
+
+// Source-level factory — always visible to IntelliSense, same behaviour:
+int result = CalculatorAddInvoker.of(calc).x(3).y(4).invoke();
+
+// Static @Invoker (no instance needed):
+String msg = FooGreetInvoker.of().name("Alice").greeting("Hello").invoke();
+
+// @Constructor:
+Point p = PointConstructor.of().x(1).y(2).construct();
+```
+
+The generated `of()` method is in the same package as the generated class
+(e.g. `com.example.generated.CalculatorAddInvoker`).
+
+### IntelliJ IDEA
+
+1. Open **Settings → Build, Execution, Deployment → Compiler → Annotation Processors**.
+2. Enable **"Enable annotation processing"**.
+3. Set **"Processor path"** (or leave at default to use the project classpath).
+4. **Rebuild** the project once — IntelliJ will discover the generated sources and add them to
+   the source path automatically.
+
+After the first build the generated `*Invoker` / `*Constructor` classes (with their `of()`
+factory methods) are visible to IntelliSense.  If you also want the bytecode-injected entry
+points (`calc.add()`, `Point.constructor()`, etc.) to appear in completion, add the following
+JVM argument to **Settings → Build, Execution, Deployment → Compiler → Java Compiler →
+"Additional command line parameters"**:
+
+```
+-J--add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED -J--add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED -J--add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED -J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED -J--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+```
+
+### Maven
+
+Add `annotationProcessorPaths` so the processor is discovered by the Maven compiler plugin:
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <version>3.13.0</version>
+    <configuration>
+        <annotationProcessorPaths>
+            <path>
+                <groupId>io.github.projectrawit</groupId>
+                <artifactId>rawit</artifactId>
+                <version>VERSION</version>
+            </path>
+        </annotationProcessorPaths>
+    </configuration>
+</plugin>
+```
+
+To also enable the AST-level injection of bytecode entry points (so `calc.add()` etc. appear
+in IntelliSense), pass the required `--add-opens` flags to the javac JVM via the `-J` prefix:
+
+```xml
+<configuration>
+    <compilerArgs>
+        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+    </compilerArgs>
+</configuration>
+```
+
+### Gradle
+
+```groovy
+dependencies {
+    annotationProcessor 'io.github.projectrawit:rawit:VERSION'
+    compileOnly 'io.github.projectrawit:rawit:VERSION'
+}
+
+// Optional: enable AST-level entry-point injection
+tasks.withType(JavaCompile).configureEach {
+    options.forkOptions.jvmArgs += [
+        '--add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED',
+        '--add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
+        '--add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED',
+        '--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED',
+        '--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED'
+    ]
+    options.fork = true
+}
+```
+
+> **Note:** The `--add-opens` flags enable Rawit to inject the entry-point method stubs
+> directly into the original class's javac AST during annotation processing so that IDEs
+> can resolve `calc.add()` from source analysis alone. Without these flags, Rawit falls
+> back gracefully — the `of()` factory method on the generated class always works, and
+> the bytecode-injected entry points remain fully functional at runtime.
+
+---
+
+
 
 Requires **Java 17** and **Maven 3.8+**.
 
