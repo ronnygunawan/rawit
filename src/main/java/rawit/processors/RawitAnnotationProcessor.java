@@ -493,7 +493,8 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
         for (final VariableElement param : exec.getParameters()) {
             final String name = param.getSimpleName().toString();
             final String descriptor = toTypeDescriptor(param.asType());
-            parameters.add(new Parameter(name, descriptor));
+            final List<String> tagFqns = extractTagAnnotationFqns(param);
+            parameters.add(new Parameter(name, descriptor, tagFqns));
         }
 
         final String returnTypeDescriptor = isConstructor
@@ -533,11 +534,23 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     private AnnotatedMethod buildAnnotatedMethodFromRecord(final TypeElement recordElement) {
         final String enclosingClassName = toBinaryName(recordElement);
 
+        // Find the canonical constructor to extract tag annotations from its parameters.
+        // Record component annotations with @Target(PARAMETER) are propagated to the
+        // canonical constructor parameters, not to the RecordComponentElement itself.
+        final List<? extends VariableElement> canonicalParams = findCanonicalConstructorParams(recordElement);
+
         final List<Parameter> parameters = new ArrayList<>();
-        for (final RecordComponentElement comp : recordElement.getRecordComponents()) {
+        final List<? extends RecordComponentElement> components = recordElement.getRecordComponents();
+        for (int i = 0; i < components.size(); i++) {
+            final RecordComponentElement comp = components.get(i);
             final String name = comp.getSimpleName().toString();
             final String descriptor = toTypeDescriptor(comp.asType());
-            parameters.add(new Parameter(name, descriptor));
+            // Try record component first, then fall back to canonical constructor parameter
+            List<String> tagFqns = extractTagAnnotationFqns(comp);
+            if (tagFqns.isEmpty() && canonicalParams != null && i < canonicalParams.size()) {
+                tagFqns = extractTagAnnotationFqns(canonicalParams.get(i));
+            }
+            parameters.add(new Parameter(name, descriptor, tagFqns));
         }
 
         final int accessFlags = resolveRecordAccessFlags(recordElement);
@@ -552,6 +565,57 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                 "V",
                 List.of(),
                 accessFlags);
+    }
+
+    /**
+     * Finds the canonical constructor's parameters for a record type.
+     * The canonical constructor has the same parameter types as the record components.
+     *
+     * @param recordElement the record type element
+     * @return the canonical constructor's parameters, or {@code null} if not found
+     */
+    private List<? extends VariableElement> findCanonicalConstructorParams(
+            final TypeElement recordElement
+    ) {
+        final List<? extends RecordComponentElement> components = recordElement.getRecordComponents();
+        for (final Element enclosed : recordElement.getEnclosedElements()) {
+            if (enclosed instanceof ExecutableElement exec
+                    && exec.getKind() == ElementKind.CONSTRUCTOR
+                    && exec.getParameters().size() == components.size()) {
+                // Verify parameter types match record component types
+                boolean match = true;
+                for (int i = 0; i < components.size(); i++) {
+                    if (!processingEnv.getTypeUtils().isSameType(
+                            exec.getParameters().get(i).asType(),
+                            components.get(i).asType())) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) {
+                    return exec.getParameters();
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Extracts fully qualified names of tag annotations (annotations meta-annotated with
+     * {@link rawit.TaggedValue @TaggedValue}) from the given element.
+     *
+     * @param element the element whose annotations to inspect
+     * @return list of FQNs of tag annotations found on the element (empty if none)
+     */
+    private List<String> extractTagAnnotationFqns(final Element element) {
+        final List<String> fqns = new ArrayList<>();
+        for (final AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            final Element annotationType = mirror.getAnnotationType().asElement();
+            if (annotationType.getAnnotation(rawit.TaggedValue.class) != null) {
+                fqns.add(((TypeElement) annotationType).getQualifiedName().toString());
+            }
+        }
+        return fqns;
     }
 
     /**

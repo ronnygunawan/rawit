@@ -157,12 +157,13 @@ public class MergeTreeBuilder {
             final String[] parts = entry.getKey().split("\0", 2);
             final String paramName = parts[0];
             final String typeDescriptor = parts[1];
+            final List<String> annotationFqns = entry.getValue().get(0).parameters().get(position).annotationFqns();
             final MergeNode next = buildNode(entry.getValue(), position + 1);
             if (next == null && !entry.getValue().isEmpty()) {
                 // Propagate conflict from deeper level
                 return null;
             }
-            return new SharedNode(paramName, typeDescriptor, next);
+            return new SharedNode(paramName, typeDescriptor, next, annotationFqns);
         }
 
         // Multiple distinct (name, type) groups — BranchingNode
@@ -171,11 +172,12 @@ public class MergeTreeBuilder {
             final String[] parts = entry.getKey().split("\0", 2);
             final String paramName = parts[0];
             final String typeDescriptor = parts[1];
+            final List<String> annotationFqns = entry.getValue().get(0).parameters().get(position).annotationFqns();
             final MergeNode next = buildNode(entry.getValue(), position + 1);
             if (next == null && !entry.getValue().isEmpty()) {
                 return null;
             }
-            branches.add(new Branch(paramName, typeDescriptor, next));
+            branches.add(new Branch(paramName, typeDescriptor, next, annotationFqns));
         }
         return new BranchingNode(branches);
     }

@@ -207,6 +207,7 @@ String b = a;           // No warning: untagged → untagged (no tags involved)
 
 1. WHEN a value is passed as an argument to a stage method in a generated builder chain (from `@Constructor` or `@Invoker`), THE TaggedValue_Analyzer SHALL apply the same tag-checking rules (Requirements 3–9) using the tag on the original constructor or method parameter as the target tag.
 2. WHEN a literal or constant value (without a tag) is passed to a stage method, THE TaggedValue_Analyzer SHALL produce no warning regardless of the `strict` attribute on the target parameter's Tag_Annotation. Literals and constants are always exempt.
+3. WHEN rawit generates stage interface methods and terminal methods from `@Constructor` or `@Invoker` annotated elements, THE code generator SHALL propagate Tag_Annotations from the original constructor or method parameters onto the corresponding generated stage method parameters, so that the TaggedValue_Analyzer can detect tag violations at the call site without requiring the analyzer to map generated methods back to their originals.
 
 #### Code Example
 

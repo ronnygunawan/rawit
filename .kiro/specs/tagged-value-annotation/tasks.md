@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement the `@TaggedValue` meta-annotation and compile-time tagged value analyzer for the rawit annotation processor. The pipeline follows: meta-annotation definition → model records (`TagInfo`, `TagResolution`, `AssignmentWarning`) → pure logic components (`TagDiscoverer`, `TagResolver`, `AssignmentChecker`) → AST scanner (`TaggedValueAnalyzer`) → processor integration. Each component is built incrementally with property-based tests (jqwik) validating correctness properties from the design document. The `AssignmentChecker` is the core pure-function component covering the full warning decision matrix.
+Implement the `@TaggedValue` meta-annotation and compile-time tagged value analyzer for the rawit annotation processor. The pipeline follows: meta-annotation definition → model records (`TagInfo`, `TagResolution`, `AssignmentWarning`) → pure logic components (`TagDiscoverer`, `TagResolver`, `AssignmentChecker`) → AST scanner (`TaggedValueAnalyzer`) → processor integration → tag annotation propagation in generated code. Each component is built incrementally with property-based tests (jqwik) validating correctness properties from the design document. The `AssignmentChecker` is the core pure-function component covering the full warning decision matrix. Tasks 13–15 extend the code generation pipeline to propagate tag annotations onto generated stage method parameters so the analyzer can detect tag violations at builder chain call sites.
 
 ## Tasks
 
@@ -177,6 +177,69 @@ Implement the `@TaggedValue` meta-annotation and compile-time tagged value analy
 - [x] 12. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
+- [x] 13. Propagate tag annotations onto generated stage method parameters
+  - [x] 13.1 Extend `Parameter` model to carry annotation FQNs
+    - Modify `src/main/java/rawit/processors/model/Parameter.java`
+    - Add a `List<String> annotationFqns` field to the record (fully qualified names of tag annotations on this parameter)
+    - Add a compact constructor that defaults `annotationFqns` to `List.of()` and defensively copies the list
+    - Add a convenience constructor `Parameter(String name, String typeDescriptor)` that delegates with an empty annotation list, preserving backward compatibility with all existing call sites
+    - _Requirements: 10.3_
+
+  - [x] 13.2 Extend `MergeNode.SharedNode` and `MergeNode.Branch` to carry annotation FQNs
+    - Modify `src/main/java/rawit/processors/model/MergeNode.java`
+    - Add `List<String> annotationFqns` field to `SharedNode` and `Branch` records
+    - Add backward-compatible convenience constructors `SharedNode(String, String, MergeNode)` and `Branch(String, String, MergeNode)` that delegate with an empty annotation list
+    - Update `MergeTreeBuilder` to propagate `annotationFqns` from `Parameter` into `SharedNode` and `Branch` when building the tree
+    - _Requirements: 10.3_
+
+  - [x] 13.3 Capture tag annotation FQNs in `RawitAnnotationProcessor`
+    - Modify `src/main/java/rawit/processors/RawitAnnotationProcessor.java`
+    - In `buildAnnotatedMethod()`: for each `VariableElement` parameter, inspect its annotations to find any that are meta-annotated with `@TaggedValue`, collect their FQNs, and pass them to the `Parameter` constructor
+    - In `buildAnnotatedMethodFromRecord()`: for each `RecordComponentElement`, inspect its annotations similarly and pass tag annotation FQNs to the `Parameter` constructor
+    - Helper method: `List<String> extractTagAnnotationFqns(Element element)` that iterates the element's annotation mirrors, checks if each annotation type is itself annotated with `@TaggedValue`, and collects matching FQNs
+    - _Requirements: 10.3_
+
+  - [x] 13.4 Update `StageInterfaceSpec` to emit annotation specs on generated parameters
+    - Modify `src/main/java/rawit/processors/codegen/StageInterfaceSpec.java`
+    - In `buildStageMethod()`: accept `List<String> annotationFqns` (from the node), and for each FQN, add an `AnnotationSpec` to the generated `ParameterSpec` using `ClassName.bestGuess(fqn)`
+    - Update all callers of `buildStageMethod()` to pass the annotation FQNs from the `SharedNode` or `Branch`
+    - _Requirements: 10.3_
+
+  - [x] 13.5 Remove "known limitation" Javadoc from `TaggedValueAnalyzer`
+    - Modify `src/main/java/rawit/processors/tagged/TaggedValueAnalyzer.java`
+    - Remove the `@Known limitation` paragraph from the class Javadoc since tag annotations are now propagated onto generated stage method parameters
+    - _Requirements: 10.3_
+
+- [x] 14. Write tests for tag annotation propagation
+  - [x] 14.1 Write property test `StageInterfaceAnnotationPropagationPropertyTest`
+    - Create `src/test/java/rawit/processors/codegen/StageInterfaceAnnotationPropagationPropertyTest.java`
+    - **Property 10: Generated stage method parameters carry propagated tag annotations**
+    - Generate random `AnnotatedMethod` models with parameters carrying random tag annotation FQN lists
+    - Build a `MergeTree` from the method, run `StageInterfaceSpec.buildAll()`
+    - For each generated stage interface, verify that the stage method's `ParameterSpec` carries `AnnotationSpec` entries matching the original parameter's tag annotation FQNs
+    - Parameters with empty annotation lists should produce parameters with no annotation specs
+    - Minimum 100 iterations
+    - **Validates: Requirements 10.3**
+
+  - [x] 14.2 Write unit test for annotation propagation in `StageInterfaceSpecTest`
+    - Add test cases to existing `src/test/java/rawit/processors/codegen/StageInterfaceSpecTest.java` (or create a new focused test class)
+    - Test specific examples:
+      - A `@Constructor` record with `@UserId long userId, @FirstName String firstName, @LastName String lastName` produces stage methods where `userId` param has `@UserId`, `firstName` param has `@FirstName`, `lastName` param has `@LastName`
+      - A parameter with no tag annotations produces a generated parameter with no annotation specs
+      - A parameter with multiple tag annotations propagates all of them
+    - _Requirements: 10.3_
+
+  - [x] 14.3 Add integration test for end-to-end annotation propagation
+    - Add test case(s) to existing `src/test/java/rawit/processors/tagged/TaggedValueAnalyzerIntegrationTest.java`
+    - Compile a `@Constructor` record with tagged parameters, then compile client code that passes mismatched tagged values to the generated builder chain
+    - Verify that the `TaggedValueAnalyzer` emits the expected tag mismatch warning at the builder call site (e.g., passing a `@FirstName` value to `.lastName(...)`)
+    - This validates the full pipeline: capture → carry → emit → analyze
+    - _Requirements: 10.1, 10.2, 10.3_
+
+- [x] 15. Checkpoint - Verify annotation propagation
+  - Ensure all new and existing tests pass
+  - Verify that the `TaggedValueAnalyzer` known limitation is resolved
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP
@@ -188,3 +251,4 @@ Implement the `@TaggedValue` meta-annotation and compile-time tagged value analy
 - The `TaggedValueAnalyzer` uses the javac Tree API (`TreePathScanner`) which requires running under javac; graceful degradation for non-javac compilers
 - `@TaggedValue` uses `RetentionPolicy.CLASS` (unlike `SOURCE` for other rawit annotations) so tag metadata survives into `.class` files for downstream projects
 - No bytecode modification or source generation is involved — this feature only emits warnings
+- Tasks 13–15 implement tag annotation propagation (Requirement 10.3): extending the `Parameter` model, propagating through `MergeNode`, emitting annotations in generated code, and removing the analyzer's known limitation about generated builder chains

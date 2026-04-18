@@ -820,4 +820,139 @@ class TaggedValueAnalyzerIntegrationTest {
                         w.contains("untagged") && w.contains("UserId")),
                 "Expected no warning for final local constant → strict tagged, got: " + warnings);
     }
+
+    // =========================================================================
+    // Test 20 — Generated builder chain: tag mismatch detected end-to-end
+    // Validates: Requirements 10.1, 10.2, 10.3
+    //
+    // Two-pass compilation:
+    //   Pass 1: compile tag annotations + @Constructor record → generates
+    //           stage interfaces with propagated tag annotations
+    //   Pass 2: compile client code that passes a @FirstName value to the
+    //           generated .lastName(...) stage method → tag mismatch warning
+    // =========================================================================
+
+    @Test
+    void generatedBuilderChain_propagatesTagAnnotations_warnsOnMismatch(
+            @TempDir final Path outputDir) throws Exception {
+
+        // --- Pass 1: compile tag annotations + @Constructor record ---
+        final String taggedUserSource =
+                "package testpkg;\n" +
+                "import rawit.Constructor;\n" +
+                "@Constructor\n" +
+                "public record TaggedUser(\n" +
+                "    @UserId long userId,\n" +
+                "    @FirstName String firstName,\n" +
+                "    @LastName String lastName\n" +
+                ") { }\n";
+
+        final List<Diagnostic<? extends JavaFileObject>> pass1Diagnostics = compileWithProcessor(
+                List.of("testpkg.UserId", "testpkg.FirstName", "testpkg.LastName",
+                        "testpkg.TaggedUser"),
+                List.of(USER_ID_SOURCE, FIRST_NAME_SOURCE, LAST_NAME_SOURCE,
+                        taggedUserSource),
+                outputDir);
+
+        assertNoErrors(pass1Diagnostics);
+
+        // --- Pass 2: compile client code that uses the generated builder chain ---
+        // Include tag annotation sources so the processor discovers them in this round.
+        // The tag annotation .class files from pass 1 are already on the classpath,
+        // but including the sources ensures the processor's TagDiscoverer finds them.
+        final String usageSource =
+                "package testpkg;\n" +
+                "public class GeneratedBuilderTagTest {\n" +
+                "    void test() {\n" +
+                "        @FirstName String name = \"John\";\n" +
+                "        TaggedUser user = TaggedUser.constructor()\n" +
+                "            .userId(10L)\n" +           // literal → strict tagged: no warning
+                "            .firstName(name)\n" +        // @FirstName → @FirstName: no warning
+                "            .lastName(name)\n" +          // @FirstName → @LastName: WARNING
+                "            .construct();\n" +
+                "    }\n" +
+                "}\n";
+
+        final List<Diagnostic<? extends JavaFileObject>> pass2Diagnostics = compileWithProcessor(
+                List.of("testpkg.UserId", "testpkg.FirstName", "testpkg.LastName",
+                        "testpkg.GeneratedBuilderTagTest"),
+                List.of(USER_ID_SOURCE, FIRST_NAME_SOURCE, LAST_NAME_SOURCE,
+                        usageSource),
+                outputDir);
+
+        assertNoErrors(pass2Diagnostics);
+        assertAllWarningsNotErrors(pass2Diagnostics);
+
+        final List<String> warnings = warningMessages(pass2Diagnostics);
+        // @FirstName → @LastName parameter should produce tag mismatch
+        assertTrue(warnings.stream().anyMatch(w -> w.contains("tag mismatch")),
+                "Expected tag mismatch warning for @FirstName → @LastName in generated builder chain, got: "
+                        + warnings);
+    }
+
+    // =========================================================================
+    // Test 21 — Generated builder chain: no warning when all tags match
+    // Validates: Requirements 8.1, 10.1, 10.2, 10.3
+    //
+    // Two-pass compilation (reuses pass 1 output from the same @TempDir):
+    //   Pass 1: compile tag annotations + @Constructor record
+    //   Pass 2: compile client code that passes correctly-tagged values
+    //           to each generated stage method → no warnings
+    // =========================================================================
+
+    @Test
+    void generatedBuilderChain_allTagsMatch_noWarning(
+            @TempDir final Path outputDir) throws Exception {
+
+        // --- Pass 1: compile tag annotations + @Constructor record ---
+        final String taggedUserSource =
+                "package testpkg;\n" +
+                "import rawit.Constructor;\n" +
+                "@Constructor\n" +
+                "public record TaggedUser(\n" +
+                "    @UserId long userId,\n" +
+                "    @FirstName String firstName,\n" +
+                "    @LastName String lastName\n" +
+                ") { }\n";
+
+        final List<Diagnostic<? extends JavaFileObject>> pass1Diagnostics = compileWithProcessor(
+                List.of("testpkg.UserId", "testpkg.FirstName", "testpkg.LastName",
+                        "testpkg.TaggedUser"),
+                List.of(USER_ID_SOURCE, FIRST_NAME_SOURCE, LAST_NAME_SOURCE,
+                        taggedUserSource),
+                outputDir);
+
+        assertNoErrors(pass1Diagnostics);
+
+        // --- Pass 2: compile client code with correctly-tagged values ---
+        // Include tag annotation sources so the processor discovers them in this round.
+        final String usageSource =
+                "package testpkg;\n" +
+                "public class GeneratedBuilderMatchTest {\n" +
+                "    void test() {\n" +
+                "        @FirstName String first = \"John\";\n" +
+                "        @LastName String last = \"Doe\";\n" +
+                "        TaggedUser user = TaggedUser.constructor()\n" +
+                "            .userId(10L)\n" +           // literal → strict tagged: no warning
+                "            .firstName(first)\n" +       // @FirstName → @FirstName: no warning
+                "            .lastName(last)\n" +          // @LastName → @LastName: no warning
+                "            .construct();\n" +
+                "    }\n" +
+                "}\n";
+
+        final List<Diagnostic<? extends JavaFileObject>> pass2Diagnostics = compileWithProcessor(
+                List.of("testpkg.UserId", "testpkg.FirstName", "testpkg.LastName",
+                        "testpkg.GeneratedBuilderMatchTest"),
+                List.of(USER_ID_SOURCE, FIRST_NAME_SOURCE, LAST_NAME_SOURCE,
+                        usageSource),
+                outputDir);
+
+        assertNoErrors(pass2Diagnostics);
+
+        final List<String> warnings = warningMessages(pass2Diagnostics);
+        assertTrue(warnings.stream().noneMatch(w ->
+                        w.contains("tag mismatch") || w.contains("strict")),
+                "Expected no warnings when all tags match in generated builder chain, got: "
+                        + warnings);
+    }
 }

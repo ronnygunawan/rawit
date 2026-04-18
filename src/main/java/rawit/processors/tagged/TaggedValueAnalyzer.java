@@ -28,13 +28,6 @@ import java.util.Optional;
  *   <li>Return statements</li>
  * </ul>
  *
- * <p><strong>Known limitation:</strong> Method-invocation tag checking relies on
- * tag annotations being present on the called method's parameter declarations.
- * Rawit's generated stage methods do not currently propagate parameter annotations
- * from the original constructor/method, so tag-mismatch checking will not fire
- * for generated builder chains unless the codegen is updated to copy tag annotations
- * or the analyzer maps stage methods back to the original parameters.
- *
  * <p>For each assignment-like expression, the analyzer:
  * <ol>
  *   <li>Resolves the target tag via {@link TagResolver}</li>
