@@ -358,9 +358,12 @@ public final class TaggedValueAnalyzer {
                         }
                         if (info != null) {
                             if (firstTag != null) {
+                                final String firstName = simpleName(firstTag.tag().annotationFqn());
+                                final String secondName = simpleName(info.annotationFqn());
                                 messager.printMessage(
                                         Diagnostic.Kind.WARNING,
-                                        "multiple tag annotations on return type; using first encountered",
+                                        "multiple tag annotations on return type; using @"
+                                                + firstName + ", ignoring @" + secondName,
                                         method
                                 );
                                 return firstTag;
@@ -374,6 +377,14 @@ public final class TaggedValueAnalyzer {
                 }
                 // Fall back to annotations on the method element itself
                 return tagResolver.resolve(method, tagMap, messager);
+            }
+
+            /**
+             * Extracts the simple name from a fully qualified name.
+             */
+            private String simpleName(final String fqn) {
+                final int dot = fqn.lastIndexOf('.');
+                return dot < 0 ? fqn : fqn.substring(dot + 1);
             }
 
             /**

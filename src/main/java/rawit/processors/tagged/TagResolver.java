@@ -25,6 +25,10 @@ import java.util.Map;
  */
 public final class TagResolver {
 
+    /** Elements already warned about having multiple tag annotations (prevents duplicate warnings). */
+    private final java.util.Set<Element> warnedMultiTagElements = java.util.Collections.newSetFromMap(
+            new java.util.IdentityHashMap<>());
+
     /**
      * Resolves the effective tag for an element by inspecting its annotations.
      * If an annotation is not yet in the tag map but carries {@code @TaggedValue},
@@ -48,7 +52,6 @@ public final class TagResolver {
                 final String fqn = typeElement.getQualifiedName().toString();
                 TagInfo info = tagMap.get(fqn);
                 if (info == null) {
-                    // Lazy discovery: check if this annotation is meta-annotated with @TaggedValue
                     info = lazyDiscover(typeElement, tagMap);
                 }
                 if (info != null) {
@@ -61,7 +64,7 @@ public final class TagResolver {
             return new TagResolution.Untagged();
         }
 
-        if (matched.size() > 1) {
+        if (matched.size() > 1 && warnedMultiTagElements.add(element)) {
             final TagInfo first = matched.get(0);
             final TagInfo second = matched.get(1);
             messager.printMessage(

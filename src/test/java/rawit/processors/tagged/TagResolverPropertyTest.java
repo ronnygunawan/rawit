@@ -90,8 +90,6 @@ class TagResolverPropertyTest {
                 });
     }
 
-    /**
-     * Generates a list of 0–4 annotation FQNs that are NOT in the given tag map.
     // -------------------------------------------------------------------------
     // Property 2: Tag resolution recognizes tags on all supported element kinds
     // Feature: tagged-value-annotation, Property 2: Tag resolution recognizes tags on all supported element kinds
