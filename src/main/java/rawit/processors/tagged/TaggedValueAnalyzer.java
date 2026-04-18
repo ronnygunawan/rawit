@@ -286,12 +286,23 @@ public final class TaggedValueAnalyzer {
                     final Optional<AssignmentWarning> warning =
                             assignmentChecker.check(sourceTag, targetTag, isLiteralOrConst);
 
-                    // Emit warning if applicable
-                    warning.ifPresent(w -> messager.printMessage(
-                            Diagnostic.Kind.WARNING,
-                            w.toMessage(),
-                            targetElement
-                    ));
+                    // Emit warning at the assignment/call site when possible
+                    warning.ifPresent(w -> {
+                        if (contextTree != null) {
+                            trees.printMessage(
+                                    Diagnostic.Kind.WARNING,
+                                    w.toMessage(),
+                                    contextTree,
+                                    compilationUnit
+                            );
+                        } else {
+                            messager.printMessage(
+                                    Diagnostic.Kind.WARNING,
+                                    w.toMessage(),
+                                    targetElement
+                            );
+                        }
+                    });
                 } catch (final NullPointerException | IllegalArgumentException ignored) {
                     // Unresolvable elements during analysis — skip this assignment
                 }

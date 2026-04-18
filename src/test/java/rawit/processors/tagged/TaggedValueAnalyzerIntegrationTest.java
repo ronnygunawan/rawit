@@ -459,4 +459,59 @@ class TaggedValueAnalyzerIntegrationTest {
                         w.contains("UserId") && w.contains("strict") && w.contains("untagged")),
                 "Expected strict tagged→untagged warning mentioning UserId, got: " + warnings);
     }
+
+    // =========================================================================
+    // Test 11 — Builder stage method chain: tag checking applies to stage method arguments
+    // Validates: Requirements 10.1, 10.2
+    // =========================================================================
+
+    @Test
+    void generatedBuilderStageMethodChain_warnsOnTagMismatch(
+            @TempDir final Path outputDir) throws Exception {
+        // Simulate a builder with stage methods that have tagged parameters
+        final String userSource =
+                "package testpkg;\n" +
+                "public class User {\n" +
+                "    public static LastNameStage constructor() {\n" +
+                "        return new Builder();\n" +
+                "    }\n" +
+                "    public interface LastNameStage {\n" +
+                "        UserIdStage lastName(@LastName String lastName);\n" +
+                "    }\n" +
+                "    public interface UserIdStage {\n" +
+                "        BuildStage id(@UserId long userId);\n" +
+                "    }\n" +
+                "    public interface BuildStage {\n" +
+                "        User build();\n" +
+                "    }\n" +
+                "    static class Builder implements LastNameStage, UserIdStage, BuildStage {\n" +
+                "        public UserIdStage lastName(@LastName String lastName) { return this; }\n" +
+                "        public BuildStage id(@UserId long userId) { return this; }\n" +
+                "        public User build() { return new User(); }\n" +
+                "    }\n" +
+                "}\n";
+
+        final String usageSource =
+                "package testpkg;\n" +
+                "public class BuilderStageMethodTest {\n" +
+                "    void test() {\n" +
+                "        @FirstName String first = \"John\";\n" +
+                "        User.constructor().lastName(first).id(10L).build();\n" +
+                "    }\n" +
+                "}\n";
+
+        final List<Diagnostic<? extends JavaFileObject>> diagnostics = compileWithProcessor(
+                List.of("testpkg.UserId", "testpkg.FirstName", "testpkg.LastName",
+                        "testpkg.User", "testpkg.BuilderStageMethodTest"),
+                List.of(USER_ID_SOURCE, FIRST_NAME_SOURCE, LAST_NAME_SOURCE, userSource, usageSource),
+                outputDir);
+
+        assertNoErrors(diagnostics);
+        assertAllWarningsNotErrors(diagnostics);
+
+        final List<String> warnings = warningMessages(diagnostics);
+        // @FirstName → @LastName parameter should produce tag mismatch
+        assertTrue(warnings.stream().anyMatch(w -> w.contains("tag mismatch")),
+                "Expected tag mismatch warning for builder stage method parameter, got: " + warnings);
+    }
 }

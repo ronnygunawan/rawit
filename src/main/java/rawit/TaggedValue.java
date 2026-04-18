@@ -16,13 +16,13 @@ import java.lang.annotation.Target;
  * tag mismatches and strict-mode violations.</p>
  *
  * <h2>Example</h2>
- * <pre>{@code
- * @TaggedValue(strict = true)
- * public @interface UserId { }
+ * <pre>
+ * &#64;TaggedValue(strict = true)
+ * public &#64;interface UserId { }
  *
- * @TaggedValue               // strict defaults to false (lax mode)
- * public @interface FirstName { }
- * }</pre>
+ * &#64;TaggedValue               // strict defaults to false (lax mode)
+ * public &#64;interface FirstName { }
+ * </pre>
  *
  * @see <a href="https://github.com/rawit">rawit documentation</a>
  */
