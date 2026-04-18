@@ -64,6 +64,10 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     private final Map<String, List<MergeTree>> pendingInvokerInjections = new LinkedHashMap<>();
     /** Pending getter injections deferred until the GENERATE phase. */
     private final Map<String, List<AnnotatedField>> pendingGetterInjections = new LinkedHashMap<>();
+    /** Compilation units already analyzed for tagged value safety (prevents duplicate warnings across rounds). */
+    private final java.util.Set<java.net.URI> analyzedTaggedValueUnits = new java.util.HashSet<>();
+    /** Cached tag map discovered across rounds (avoids re-scanning enclosed elements). */
+    private final Map<String, TagInfo> cachedTagMap = new LinkedHashMap<>();
     /**
      * {@code true} when a {@link TaskListener} was successfully registered on the underlying
      * {@link JavacTask}, enabling single-pass deferred injection.
@@ -134,14 +138,13 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
         final boolean debug = isDebugEnabled();
 
         // --- @TaggedValue processing ---
-        // Runs unconditionally: tag annotations may come from pre-compiled JARs,
-        // so the annotations set may not contain rawit.TaggedValue even when tag
-        // usages are present in source.
+        // Merge newly discovered tags into the cached map (avoids re-scanning in later rounds).
         final TagDiscoverer tagDiscoverer = new TagDiscoverer();
-        final Map<String, TagInfo> tagMap = tagDiscoverer.discover(roundEnv, processingEnv);
-        if (!tagMap.isEmpty()) {
+        final Map<String, TagInfo> roundTagMap = tagDiscoverer.discover(roundEnv, processingEnv);
+        cachedTagMap.putAll(roundTagMap);
+        if (!cachedTagMap.isEmpty()) {
             final TaggedValueAnalyzer taggedValueAnalyzer = new TaggedValueAnalyzer();
-            taggedValueAnalyzer.analyzeRound(tagMap, roundEnv, processingEnv);
+            taggedValueAnalyzer.analyzeRound(cachedTagMap, roundEnv, processingEnv, analyzedTaggedValueUnits);
         }
 
         if (annotations.isEmpty()) {

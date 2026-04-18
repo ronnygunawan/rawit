@@ -7,7 +7,6 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.tools.Diagnostic;
@@ -57,14 +56,16 @@ public final class TaggedValueAnalyzer {
      * @param tagMap        the known tag annotations (FQN → {@link TagInfo})
      * @param roundEnv      the current round environment
      * @param processingEnv the processing environment
+     * @param analyzedUnits compilation units already analyzed across rounds (prevents duplicate warnings)
      */
     public void analyzeRound(
             final Map<String, TagInfo> tagMap,
             final RoundEnvironment roundEnv,
-            final ProcessingEnvironment processingEnv
+            final ProcessingEnvironment processingEnv,
+            final java.util.Set<java.net.URI> analyzedUnits
     ) {
         try {
-            doAnalyzeRound(tagMap, roundEnv, processingEnv);
+            doAnalyzeRound(tagMap, roundEnv, processingEnv, analyzedUnits);
         } catch (final NoClassDefFoundError ignored) {
             // Tree API not available (e.g. ECJ) — silently skip
         } catch (final UnsupportedOperationException ignored) {
@@ -79,7 +80,8 @@ public final class TaggedValueAnalyzer {
     private void doAnalyzeRound(
             final Map<String, TagInfo> tagMap,
             final RoundEnvironment roundEnv,
-            final ProcessingEnvironment processingEnv
+            final ProcessingEnvironment processingEnv,
+            final java.util.Set<java.net.URI> analyzedUnits
     ) {
         final com.sun.source.util.Trees trees;
         try {
@@ -88,8 +90,6 @@ public final class TaggedValueAnalyzer {
             // Cannot obtain Trees instance — silently skip
             return;
         }
-
-        final java.util.Set<java.net.URI> analyzedCompilationUnits = new java.util.HashSet<>();
 
         // Iterate all root elements in the round and analyze each compilation unit once
         for (final Element rootElement : roundEnv.getRootElements()) {
@@ -107,7 +107,7 @@ public final class TaggedValueAnalyzer {
                     continue;
                 }
                 final java.net.URI sourceUri = compilationUnit.getSourceFile().toUri();
-                if (!analyzedCompilationUnits.add(sourceUri)) {
+                if (!analyzedUnits.add(sourceUri)) {
                     continue;
                 }
                 analyze(tagMap, compilationUnit, trees, processingEnv);
@@ -362,8 +362,9 @@ public final class TaggedValueAnalyzer {
              * <p>Checks for:
              * <ul>
              *   <li>{@code LiteralTree} — numeric, string, boolean, char, null literals</li>
-             *   <li>{@code IdentifierTree} referencing a variable with a constant value
-             *       (including {@code static final} fields and {@code final} locals)</li>
+             *   <li>{@code IdentifierTree} referencing a variable with a constant value</li>
+             *   <li>{@code MemberSelectTree} referencing a qualified constant (e.g. {@code Constants.VALUE})</li>
+             *   <li>{@code ParenthesizedTree} wrapping any of the above</li>
              * </ul>
              */
             private boolean isLiteralOrConstant(
@@ -373,10 +374,14 @@ public final class TaggedValueAnalyzer {
                 if (expr instanceof com.sun.source.tree.LiteralTree) {
                     return true;
                 }
-                if (expr instanceof com.sun.source.tree.IdentifierTree) {
-                    final com.sun.source.util.TreePath idPath =
+                if (expr instanceof com.sun.source.tree.ParenthesizedTree paren) {
+                    return isLiteralOrConstant(paren.getExpression(), parentPath);
+                }
+                if (expr instanceof com.sun.source.tree.IdentifierTree
+                        || expr instanceof com.sun.source.tree.MemberSelectTree) {
+                    final com.sun.source.util.TreePath exprPath =
                             new com.sun.source.util.TreePath(parentPath, expr);
-                    final Element element = trees.getElement(idPath);
+                    final Element element = trees.getElement(exprPath);
                     if (element instanceof VariableElement varElement) {
                         return varElement.getConstantValue() != null;
                     }
