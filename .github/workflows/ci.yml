@@ -2,10 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [ "**" ]
+    branches: [ "master" ]
     tags-ignore: [ "v*" ]
   pull_request:
-    branches: [ "**" ]
+    branches: [ "master" ]
 
 jobs:
   build-and-test:
@@ -23,6 +23,14 @@ jobs:
 
       - name: Build and test
         run: mvn --batch-mode verify
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: target/site/jacoco/jacoco.xml
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   test-maven-sample:
     runs-on: ubuntu-latest

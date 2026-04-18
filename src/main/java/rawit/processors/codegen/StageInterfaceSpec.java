@@ -1,6 +1,8 @@
 package rawit.processors.codegen;
 
+import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import rawit.processors.model.AnnotatedMethod;
@@ -74,7 +76,7 @@ public class StageInterfaceSpec {
             final String ifaceName = stageInterfaceName(shared.paramName(), prevParamName, position, false);
             final TypeName returnType = nextTypeName(shared.next(), shared.paramName(), position + 1);
             final TypeSpec iface = buildSingleMethodInterface(
-                    ifaceName, shared.paramName(), shared.typeDescriptor(), returnType);
+                    ifaceName, shared.paramName(), shared.typeDescriptor(), shared.annotationFqns(), returnType);
             out.add(iface);
             buildInterfaces(shared.next(), shared.paramName(), position + 1, out);
         } else if (node instanceof BranchingNode branching) {
@@ -111,9 +113,10 @@ public class StageInterfaceSpec {
             final String ifaceName,
             final String paramName,
             final String typeDescriptor,
+            final List<String> annotationFqns,
             final TypeName returnType
     ) {
-        final MethodSpec method = buildStageMethod(paramName, typeDescriptor, returnType);
+        final MethodSpec method = buildStageMethod(paramName, typeDescriptor, annotationFqns, returnType);
         return TypeSpec.interfaceBuilder(ifaceName)
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(FunctionalInterface.class)
@@ -132,7 +135,7 @@ public class StageInterfaceSpec {
 
         for (final MergeNode.Branch branch : branching.branches()) {
             final TypeName returnType = nextTypeName(branch.next(), branch.paramName(), position + 1);
-            builder.addMethod(buildStageMethod(branch.paramName(), branch.typeDescriptor(), returnType));
+            builder.addMethod(buildStageMethod(branch.paramName(), branch.typeDescriptor(), branch.annotationFqns(), returnType));
         }
 
         // A branching interface with more than one method cannot be @FunctionalInterface.
@@ -150,13 +153,18 @@ public class StageInterfaceSpec {
     private MethodSpec buildStageMethod(
             final String paramName,
             final String typeDescriptor,
+            final List<String> annotationFqns,
             final TypeName returnType
     ) {
         final TypeName paramType = TerminalInterfaceSpec.descriptorToTypeName(typeDescriptor);
+        final ParameterSpec.Builder paramBuilder = ParameterSpec.builder(paramType, paramName);
+        for (final String fqn : annotationFqns) {
+            paramBuilder.addAnnotation(ClassName.bestGuess(fqn));
+        }
         final MethodSpec.Builder mb = MethodSpec.methodBuilder(paramName)
                 .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
                 .returns(returnType)
-                .addParameter(paramType, paramName);
+                .addParameter(paramBuilder.build());
 
         // Propagate checked exceptions from all members in the group — deduplicated
         final Set<String> seen = new LinkedHashSet<>();
@@ -219,15 +227,15 @@ public class StageInterfaceSpec {
         }
         if (nextNode instanceof SharedNode shared) {
             final String name = stageInterfaceName(shared.paramName(), currentParamName, nextPosition, false);
-            return com.squareup.javapoet.ClassName.bestGuess(name);
+            return ClassName.bestGuess(name);
         } else if (nextNode instanceof BranchingNode branching) {
             final String name = branchingInterfaceName(currentParamName, nextPosition);
-            return com.squareup.javapoet.ClassName.bestGuess(name);
+            return ClassName.bestGuess(name);
         } else if (nextNode instanceof TerminalNode terminal) {
             if (terminal.continuation() != null) {
                 // The terminal node also has a continuation — the return type is the
                 // combined interface that exposes both invoke() and the continuation's methods
-                return com.squareup.javapoet.ClassName.bestGuess(
+                return ClassName.bestGuess(
                         combinedInterfaceName(currentParamName, nextPosition));
             }
             return terminalTypeName();
@@ -236,7 +244,7 @@ public class StageInterfaceSpec {
     }
 
     private TypeName terminalTypeName() {
-        return com.squareup.javapoet.ClassName.bestGuess(
+        return ClassName.bestGuess(
                 isInvoker ? "InvokeStageInvoker" : "ConstructStageInvoker");
     }
 
@@ -276,11 +284,11 @@ public class StageInterfaceSpec {
         // Add the continuation's stage methods
         if (continuation instanceof SharedNode shared) {
             final TypeName returnType = nextTypeName(shared.next(), shared.paramName(), position + 1);
-            builder.addMethod(buildStageMethod(shared.paramName(), shared.typeDescriptor(), returnType));
+            builder.addMethod(buildStageMethod(shared.paramName(), shared.typeDescriptor(), shared.annotationFqns(), returnType));
         } else if (continuation instanceof BranchingNode branching) {
             for (final MergeNode.Branch branch : branching.branches()) {
                 final TypeName returnType = nextTypeName(branch.next(), branch.paramName(), position + 1);
-                builder.addMethod(buildStageMethod(branch.paramName(), branch.typeDescriptor(), returnType));
+                builder.addMethod(buildStageMethod(branch.paramName(), branch.typeDescriptor(), branch.annotationFqns(), returnType));
             }
         } else if (continuation instanceof TerminalNode) {
             throw new IllegalStateException(

@@ -21,12 +21,24 @@ public sealed interface MergeNode permits MergeNode.SharedNode, MergeNode.Branch
      * @param paramName      the shared parameter name
      * @param typeDescriptor the shared JVM type descriptor
      * @param next           the next node in the chain (may be {@code null} if this is the last)
+     * @param annotationFqns fully qualified names of tag annotations on this parameter (empty if none)
      */
     record SharedNode(
             String paramName,
             String typeDescriptor,
-            MergeNode next
-    ) implements MergeNode {}
+            MergeNode next,
+            List<String> annotationFqns
+    ) implements MergeNode {
+        /** Defensive copy; defaults {@code annotationFqns} to empty if null. */
+        public SharedNode {
+            annotationFqns = annotationFqns == null ? List.of() : List.copyOf(annotationFqns);
+        }
+
+        /** Backward-compatible convenience constructor that delegates with an empty annotation list. */
+        public SharedNode(String paramName, String typeDescriptor, MergeNode next) {
+            this(paramName, typeDescriptor, next, List.of());
+        }
+    }
 
     /**
      * A position where overloads diverge into distinct (name, type) variants.
@@ -64,10 +76,22 @@ public sealed interface MergeNode permits MergeNode.SharedNode, MergeNode.Branch
      * @param paramName      the parameter name for this branch
      * @param typeDescriptor the JVM type descriptor for this branch
      * @param next           the next node following this branch
+     * @param annotationFqns fully qualified names of tag annotations on this parameter (empty if none)
      */
     record Branch(
             String paramName,
             String typeDescriptor,
-            MergeNode next
-    ) {}
+            MergeNode next,
+            List<String> annotationFqns
+    ) {
+        /** Defensive copy; defaults {@code annotationFqns} to empty if null. */
+        public Branch {
+            annotationFqns = annotationFqns == null ? List.of() : List.copyOf(annotationFqns);
+        }
+
+        /** Backward-compatible convenience constructor that delegates with an empty annotation list. */
+        public Branch(String paramName, String typeDescriptor, MergeNode next) {
+            this(paramName, typeDescriptor, next, List.of());
+        }
+    }
 }

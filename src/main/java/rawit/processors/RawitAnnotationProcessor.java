@@ -15,6 +15,10 @@ import rawit.processors.model.AnnotatedMethod;
 import rawit.processors.model.MergeTree;
 import rawit.processors.model.OverloadGroup;
 import rawit.processors.model.Parameter;
+import rawit.processors.model.TagInfo;
+import rawit.processors.tagged.TagDiscoverer;
+import rawit.processors.tagged.TagResolver;
+import rawit.processors.tagged.TaggedValueAnalyzer;
 import rawit.processors.validation.ElementValidator;
 import rawit.processors.validation.GetterValidator;
 import rawit.processors.validation.ValidationResult;
@@ -61,6 +65,12 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     private final Map<String, List<MergeTree>> pendingInvokerInjections = new LinkedHashMap<>();
     /** Pending getter injections deferred until the GENERATE phase. */
     private final Map<String, List<AnnotatedField>> pendingGetterInjections = new LinkedHashMap<>();
+    /** Compilation units already analyzed for tagged value safety (prevents duplicate warnings across rounds). */
+    private final java.util.Set<java.net.URI> analyzedTaggedValueUnits = new java.util.HashSet<>();
+    /** Cached tag map discovered across rounds (avoids re-scanning enclosed elements). */
+    private final Map<String, TagInfo> cachedTagMap = new LinkedHashMap<>();
+    /** Annotation FQNs known not to be tag annotations (negative lookup cache). */
+    private final java.util.Set<String> notTagAnnotations = new java.util.HashSet<>();
     /**
      * {@code true} when a {@link TaskListener} was successfully registered on the underlying
      * {@link JavacTask}, enabling single-pass deferred injection.
@@ -113,7 +123,11 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
 
     @Override
     public final Set<String> getSupportedAnnotationTypes() {
-        return Set.of(INVOKER_ANNOTATION_FQN, CONSTRUCTOR_ANNOTATION_FQN, GETTER_ANNOTATION_FQN);
+        // Use "*" so the processor is invoked even when only user-defined tag
+        // annotations (meta-annotated with @TaggedValue) are present in source.
+        // Without this, downstream projects that consume tag annotations from a
+        // library JAR would never trigger the TaggedValueAnalyzer.
+        return Set.of("*");
     }
 
     @Override
@@ -124,11 +138,46 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     @Override
     public final boolean process(final Set<? extends TypeElement> annotations,
                                  final RoundEnvironment roundEnv) {
+        final boolean debug = isDebugEnabled();
+
+        // --- @TaggedValue processing ---
+        // Merge newly discovered tags into the cached map (avoids re-scanning in later rounds).
+        final TagDiscoverer tagDiscoverer = new TagDiscoverer();
+        final Map<String, TagInfo> roundTagMap = tagDiscoverer.discover(roundEnv, processingEnv);
+        cachedTagMap.putAll(roundTagMap);
+
+        // Also scan the annotations set for tag annotations from dependency JARs.
+        // Skip annotations already known to be tags or known not to be tags.
+        for (final TypeElement annotation : annotations) {
+            final String fqn = annotation.getQualifiedName().toString();
+            if (!cachedTagMap.containsKey(fqn) && !notTagAnnotations.contains(fqn)) {
+                final TagInfo discovered = TagResolver.lazyDiscover(annotation, cachedTagMap);
+                if (discovered == null) {
+                    notTagAnnotations.add(fqn);
+                }
+            }
+        }
+
+        if (!cachedTagMap.isEmpty()) {
+            final TaggedValueAnalyzer taggedValueAnalyzer = new TaggedValueAnalyzer();
+            taggedValueAnalyzer.analyzeRound(cachedTagMap, roundEnv, processingEnv, analyzedTaggedValueUnits);
+        }
+
         if (annotations.isEmpty()) {
             return false;
         }
 
-        final boolean debug = isDebugEnabled();
+        // Early exit: if no rawit annotations are present, skip getter/invoker processing.
+        // Since getSupportedAnnotationTypes() returns "*", the processor runs on every round.
+        final boolean hasRawitAnnotations = annotations.stream().anyMatch(a -> {
+            final String fqn = a.getQualifiedName().toString();
+            return INVOKER_ANNOTATION_FQN.equals(fqn)
+                    || CONSTRUCTOR_ANNOTATION_FQN.equals(fqn)
+                    || GETTER_ANNOTATION_FQN.equals(fqn);
+        });
+        if (!hasRawitAnnotations) {
+            return false;
+        }
 
         // --- @Getter processing ---
         final List<AnnotatedField> validGetterFields = new ArrayList<>();
@@ -444,7 +493,8 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
         for (final VariableElement param : exec.getParameters()) {
             final String name = param.getSimpleName().toString();
             final String descriptor = toTypeDescriptor(param.asType());
-            parameters.add(new Parameter(name, descriptor));
+            final List<String> tagFqns = extractTagAnnotationFqns(param);
+            parameters.add(new Parameter(name, descriptor, tagFqns));
         }
 
         final String returnTypeDescriptor = isConstructor
@@ -484,11 +534,23 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
     private AnnotatedMethod buildAnnotatedMethodFromRecord(final TypeElement recordElement) {
         final String enclosingClassName = toBinaryName(recordElement);
 
+        // Find the canonical constructor to extract tag annotations from its parameters.
+        // Record component annotations with @Target(PARAMETER) are propagated to the
+        // canonical constructor parameters, not to the RecordComponentElement itself.
+        final List<? extends VariableElement> canonicalParams = findCanonicalConstructorParams(recordElement);
+
         final List<Parameter> parameters = new ArrayList<>();
-        for (final RecordComponentElement comp : recordElement.getRecordComponents()) {
+        final List<? extends RecordComponentElement> components = recordElement.getRecordComponents();
+        for (int i = 0; i < components.size(); i++) {
+            final RecordComponentElement comp = components.get(i);
             final String name = comp.getSimpleName().toString();
             final String descriptor = toTypeDescriptor(comp.asType());
-            parameters.add(new Parameter(name, descriptor));
+            // Try record component first, then fall back to canonical constructor parameter
+            List<String> tagFqns = extractTagAnnotationFqns(comp);
+            if (tagFqns.isEmpty() && canonicalParams != null && i < canonicalParams.size()) {
+                tagFqns = extractTagAnnotationFqns(canonicalParams.get(i));
+            }
+            parameters.add(new Parameter(name, descriptor, tagFqns));
         }
 
         final int accessFlags = resolveRecordAccessFlags(recordElement);
@@ -503,6 +565,71 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                 "V",
                 List.of(),
                 accessFlags);
+    }
+
+    /**
+     * Finds the canonical constructor's parameters for a record type.
+     * The canonical constructor has the same parameter types as the record components.
+     *
+     * @param recordElement the record type element
+     * @return the canonical constructor's parameters, or {@code null} if not found
+     */
+    private List<? extends VariableElement> findCanonicalConstructorParams(
+            final TypeElement recordElement
+    ) {
+        final List<? extends RecordComponentElement> components = recordElement.getRecordComponents();
+        for (final Element enclosed : recordElement.getEnclosedElements()) {
+            if (enclosed instanceof ExecutableElement exec
+                    && exec.getKind() == ElementKind.CONSTRUCTOR
+                    && exec.getParameters().size() == components.size()) {
+                // Verify parameter types match record component types
+                boolean match = true;
+                for (int i = 0; i < components.size(); i++) {
+                    if (!processingEnv.getTypeUtils().isSameType(
+                            exec.getParameters().get(i).asType(),
+                            components.get(i).asType())) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) {
+                    return exec.getParameters();
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Extracts fully qualified names of tag annotations (annotations meta-annotated with
+     * {@link rawit.TaggedValue @TaggedValue}) from the given element.
+     *
+     * <p>Uses mirror-based inspection rather than {@link Element#getAnnotation(Class)}
+     * because {@code @TaggedValue} has {@code RetentionPolicy.CLASS}, and
+     * {@code getAnnotation()} only works reliably for {@code RUNTIME}-retained annotations
+     * when the annotation type comes from a pre-compiled JAR.
+     *
+     * @param element the element whose annotations to inspect
+     * @return list of FQNs of tag annotations found on the element (empty if none)
+     */
+    private List<String> extractTagAnnotationFqns(final Element element) {
+        final String taggedValueFqn = rawit.TaggedValue.class.getCanonicalName();
+        final List<String> fqns = new ArrayList<>();
+        for (final AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            final Element annotationType = mirror.getAnnotationType().asElement();
+            if (annotationType instanceof TypeElement typeElement) {
+                // Check if this annotation type is itself meta-annotated with @TaggedValue
+                for (final AnnotationMirror meta : typeElement.getAnnotationMirrors()) {
+                    final Element metaType = meta.getAnnotationType().asElement();
+                    if (metaType instanceof TypeElement metaTypeElement
+                            && metaTypeElement.getQualifiedName().contentEquals(taggedValueFqn)) {
+                        fqns.add(typeElement.getQualifiedName().toString());
+                        break;
+                    }
+                }
+            }
+        }
+        return fqns;
     }
 
     /**
