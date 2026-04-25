@@ -1071,4 +1071,83 @@ class RawitAnnotationProcessorIntegrationTest {
             assertEquals(7, pointClass.getField("y").get(result));
         }
     }
+
+    // =========================================================================
+    // Coverage: toInternalName — methods with checked exceptions
+    // =========================================================================
+
+    /**
+     * Covers {@code RawitAnnotationProcessor.toInternalName}: the processor must build a valid
+     * {@link rawit.processors.model.AnnotatedMethod} for a method that declares checked exceptions.
+     *
+     * <p>This exercises the {@code DeclaredType} branch of {@code toInternalName} (the main
+     * uncovered path in the method).
+     */
+    @Test
+    void process_methodWithCheckedExceptions_generatesInvokerWithoutError(
+            @TempDir final Path outputDir) throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class ThrowingFoo {\n" +
+                "    @Invoker\n" +
+                "    public int riskyOp(int x) throws java.io.IOException {\n" +
+                "        if (x < 0) throw new java.io.IOException(\"negative\");\n" +
+                "        return x * 2;\n" +
+                "    }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader =
+                     compileSinglePassAndLoad("testpkg.ThrowingFoo", source, outputDir)) {
+            // The entry-point must be present on the original class
+            final Class<?> cls = loader.loadClass("testpkg.ThrowingFoo");
+            final java.lang.reflect.Method entry = cls.getMethod("riskyOp");
+            assertNotNull(entry, "riskyOp() must be injected on ThrowingFoo");
+            assertEquals(0, entry.getParameterCount());
+        }
+    }
+
+    // =========================================================================
+    // Coverage: debug mode (invoker.debug=true)
+    // =========================================================================
+
+    /**
+     * Compiles with {@code -Ainvoker.debug=true} and verifies the compilation succeeds.
+     * This exercises the debug NOTE-emission branches in {@link RawitAnnotationProcessor#process}.
+     */
+    @Test
+    void process_debugMode_compilesSuccessfully(@TempDir final Path outputDir) throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class DebugFoo {\n" +
+                "    @Invoker\n" +
+                "    public int add(int x, int y) { return x + y; }\n" +
+                "}\n";
+
+        final DiagnosticCollector<JavaFileObject> collector = new DiagnosticCollector<>();
+        final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        assertNotNull(compiler, "JavaCompiler not available");
+        try (final StandardJavaFileManager fm =
+                     compiler.getStandardFileManager(collector, null, null)) {
+            fm.setLocation(StandardLocation.CLASS_OUTPUT, List.of(outputDir.toFile()));
+            fm.setLocation(StandardLocation.SOURCE_OUTPUT, List.of(outputDir.toFile()));
+            final JavaFileObject fo = new SimpleJavaFileObject(
+                    URI.create("string:///testpkg/DebugFoo.java"),
+                    JavaFileObject.Kind.SOURCE) {
+                @Override public CharSequence getCharContent(boolean ig) { return source; }
+            };
+            final JavaCompiler.CompilationTask task = compiler.getTask(
+                    null, fm, collector,
+                    List.of("-classpath", buildClasspath(outputDir),
+                            "-Ainvoker.debug=true"),
+                    null, List.of(fo));
+            task.setProcessors(List.of(new RawitAnnotationProcessor()));
+            final boolean ok = task.call();
+            final boolean hasError = collector.getDiagnostics().stream()
+                    .anyMatch(d -> d.getKind() == Diagnostic.Kind.ERROR);
+            assertFalse(hasError, "debug mode must not emit errors");
+            assertTrue(ok, "compilation must succeed in debug mode");
+        }
+    }
 }
