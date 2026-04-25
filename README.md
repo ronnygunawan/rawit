@@ -69,7 +69,7 @@ javac's post-generate phase via a `TaskListener` and injects bytecode after each
 written. On non-`javac` compilers (for example, ECJ), this single-pass injection path is not
 guaranteed, so fallback behavior or additional compiler-specific configuration may be required.
 
-For IDE integration, see [IDE Integration](#-ide-integration) below.
+For VS Code Java users, see [IDE Integration](#-ide-integration-vs-code-java) below.
 
 ### 2. Annotate your code
 
@@ -368,17 +368,47 @@ Rawit catches mistakes early. You'll get a clear `javac` error for:
 
 ---
 
-## 💡 IDE Integration
+## 💡 IDE Integration (VS Code Java)
 
-The annotation processor automatically makes entry-point methods (e.g. `Foo.constructor()`,
-`foo.bar()`) available on the original class — no separate import or generated class needed.
+Rawit is designed to work with any Java build tool, but VS Code Java (JDT LS / ECJ) requires a
+small extra step because the JDT Language Server rebuilds its type model from **source files**,
+not bytecode. The entry-point methods injected into `.class` files by `BytecodeInjector`
+(e.g. `Foo.constructor()`, `foo.bar()`) may not be immediately visible to JDT LS.
 
-| Annotation path | Entry-point |
-|-----------------|-------------|
-| `@Constructor` on `Foo` | `Foo.constructor()` |
-| `@Invoker` on instance method `Foo.bar()` | `foo.bar()` |
-| `@Invoker` on static method `Foo.bar()` | `Foo.bar()` |
-| `@Invoker` on constructor `Foo(int x)` | `Foo.foo()` |
+### Instant IDE reflection — generated class entry-points
+
+Every generated Invoker / Constructor class contains a **`public static` IDE entry-point** that
+mirrors the bytecode-injected method. Because this method is part of the generated *source* file,
+JDT LS indexes it immediately after annotation processing runs — no workspace clean required.
+
+| Annotation path | Bytecode entry-point (CLI) | Generated class entry-point (IDE) |
+|-----------------|----------------------------|-----------------------------------|
+| `@Constructor` on `Foo` | `Foo.constructor()` | `FooConstructor.constructor()` |
+| `@Invoker` on `Foo.bar()` (instance) | `foo.bar()` | `FooBarInvoker.bar(foo)` |
+| `@Invoker` on static `Foo.bar()` | `Foo.bar()` | `FooBarInvoker.bar()` |
+| `@Invoker` on constructor `Foo(int x)` | `Foo.foo()` | `FooInvoker.foo()` |
+
+The two entry-points produce **identical chains** and **identical results**:
+
+```java
+// CLI / javac path (bytecode-injected entry-point)
+Point p = Point.constructor().x(1).y(2).construct();
+
+// IDE path (source-visible entry-point on generated class)
+Point p = PointConstructor.constructor().x(1).y(2).construct();
+```
+
+### Tip: import the generated package
+
+Generated classes live in the `generated` sub-package of the original class. For example,
+`class com.example.Point` → generated class `com.example.generated.PointConstructor`. Import the
+generated package for quick IDE completion:
+
+```java
+import com.example.generated.PointConstructor;
+
+Point p = PointConstructor.constructor().x(1).y(2).construct();
+```
 
 ---
 
