@@ -43,7 +43,8 @@ public class JavacAstInjector {
             String methodName,
             String callerFqn,
             boolean instanceMethod,
-            String enclosingFqn) {}
+            String enclosingFqn,
+            long accessFlags) {}
 
     // -------------------------------------------------------------------------
     // Reflection handles — all typed as Object / Method / Field to avoid
@@ -70,11 +71,9 @@ public class JavacAstInjector {
     private final Method listAppend;
     private final Method listOf1;
     private final Field jcMethodDeclName;
+    private final Field jcMethodDeclParams;
     private final Field listHead;
     private final Field listTail;
-
-    // public static = ACC_PUBLIC | ACC_STATIC
-    private static final long PUBLIC_STATIC_FLAGS = 0x0001L | 0x0008L;
 
     private JavacAstInjector(
             Object treeMaker, Object names, Trees trees,
@@ -83,7 +82,7 @@ public class JavacAstInjector {
             Method nmFromString, Field jcClassDeclDefs,
             Class<?> jcClassDeclClass, Class<?> jcMethodDeclClass,
             Object listNil, Method listAppend, Method listOf1,
-            Field jcMethodDeclName, Field listHead, Field listTail) {
+            Field jcMethodDeclName, Field jcMethodDeclParams, Field listHead, Field listTail) {
         this.treeMaker = treeMaker;
         this.names = names;
         this.trees = trees;
@@ -103,6 +102,7 @@ public class JavacAstInjector {
         this.listAppend = listAppend;
         this.listOf1 = listOf1;
         this.jcMethodDeclName = jcMethodDeclName;
+        this.jcMethodDeclParams = jcMethodDeclParams;
         this.listHead = listHead;
         this.listTail = listTail;
     }
@@ -123,8 +123,11 @@ public class JavacAstInjector {
             // JavacTask.instance() throws IllegalArgumentException when not running under javac
             final JavacTask javacTask = JavacTask.instance(env);
 
-            // BasicJavacTask.getContext() returns the compiler Context
+            // BasicJavacTask.getContext() returns the compiler Context.
+            // Use setAccessible(true) because BasicJavacTask is in a non-exported package
+            // (jdk.compiler/com.sun.tools.javac.api) on Java 9+.
             final Method getContext = javacTask.getClass().getMethod("getContext");
+            getContext.setAccessible(true);
             final Object context = getContext.invoke(javacTask);
 
             final Trees trees = Trees.instance(env);
@@ -150,37 +153,59 @@ public class JavacAstInjector {
             if (treeMaker == null || names == null) return null;
 
             // Build reflection method handles for TreeMaker
+            // setAccessible(true) is required on Java 9+ without --add-opens (silently fails if missing)
             final Method tmModifiers = treeMakerClass.getMethod("Modifiers", long.class);
+            tmModifiers.setAccessible(true);
             final Method tmIdent = treeMakerClass.getMethod("Ident", nameClass);
+            tmIdent.setAccessible(true);
             final Method tmSelect = treeMakerClass.getMethod("Select", jcExprClass, nameClass);
+            tmSelect.setAccessible(true);
             final Method tmVarDef = treeMakerClass.getMethod("VarDef",
                     jcModifiersClass, nameClass, jcExprClass, jcExprClass);
+            tmVarDef.setAccessible(true);
             final Method tmBlock = treeMakerClass.getMethod("Block", long.class, listClass);
+            tmBlock.setAccessible(true);
             final Method tmReturn = treeMakerClass.getMethod("Return", jcExprClass);
+            tmReturn.setAccessible(true);
             // NewClass(encl, typeargs, clazz, args, def)
             final Method tmNewClass = treeMakerClass.getMethod("NewClass",
                     jcExprClass, listClass, jcExprClass, listClass, jcClassDeclClass);
+            tmNewClass.setAccessible(true);
             // MethodDef(mods, name, restype, typarams, params, thrown, body, defaultValue)
             final Method tmMethodDef = treeMakerClass.getMethod("MethodDef",
                     jcModifiersClass, nameClass, jcExprClass,
                     listClass, listClass, listClass, jcBlockClass, jcExprClass);
+            tmMethodDef.setAccessible(true);
 
             final Method nmFromString = namesClass.getMethod("fromString", String.class);
+            nmFromString.setAccessible(true);
 
             // JCClassDecl.defs: the list of class members
             final Field jcClassDeclDefs = jcClassDeclClass.getField("defs");
+            jcClassDeclDefs.setAccessible(true);
 
             // List utility
-            final Object listNil = listClass.getMethod("nil").invoke(null);
+            final Method listNilMethod = listClass.getMethod("nil");
+            listNilMethod.setAccessible(true);
+            final Object listNil = listNilMethod.invoke(null);
             final Method listAppend = listClass.getMethod("append", Object.class);
+            listAppend.setAccessible(true);
             final Method listOf1 = listClass.getMethod("of", Object.class);
+            listOf1.setAccessible(true);
 
             // JCMethodDecl.name field (for idempotency check)
             final Field jcMethodDeclName = jcMethodDeclClass.getField("name");
+            jcMethodDeclName.setAccessible(true);
+
+            // JCMethodDecl.params field (for zero-param idempotency check)
+            final Field jcMethodDeclParams = jcMethodDeclClass.getField("params");
+            jcMethodDeclParams.setAccessible(true);
 
             // List.head / List.tail for iteration
             final Field listHead = listClass.getField("head");
+            listHead.setAccessible(true);
             final Field listTail = listClass.getField("tail");
+            listTail.setAccessible(true);
 
             return new JavacAstInjector(
                     treeMaker, names, trees,
@@ -189,7 +214,7 @@ public class JavacAstInjector {
                     nmFromString, jcClassDeclDefs,
                     jcClassDeclClass, jcMethodDeclClass,
                     listNil, listAppend, listOf1,
-                    jcMethodDeclName, listHead, listTail);
+                    jcMethodDeclName, jcMethodDeclParams, listHead, listTail);
 
         } catch (final IllegalArgumentException ignored) {
             // Not running under javac
@@ -257,8 +282,8 @@ public class JavacAstInjector {
             // Build method body block
             final Object body = tmBlock.invoke(treeMaker, 0L, listOf1.invoke(null, returnStmt));
 
-            // Modifiers: instance @Invoker → public; everything else → public static
-            final long accessFlags = entryPoint.instanceMethod() ? 0x0001L : PUBLIC_STATIC_FLAGS;
+            // Modifiers: use the access flags resolved from the original member
+            final long accessFlags = entryPoint.accessFlags();
             final Object mods = tmModifiers.invoke(treeMaker, accessFlags);
 
             final Object methodDecl = tmMethodDef.invoke(treeMaker,
@@ -324,8 +349,13 @@ public class JavacAstInjector {
     }
 
     /**
-     * Returns {@code true} if the given class AST already contains any method with the
-     * given simple name. Used to ensure idempotent injection.
+     * Returns {@code true} if the given class AST already contains a <em>zero-parameter</em>
+     * method with the given simple name. Used to ensure idempotent injection.
+     *
+     * <p>A method on the original class may have the same name as the entry-point being
+     * injected (e.g. {@code multiply(int,int)} for an {@code @Invoker} named {@code multiply}).
+     * Checking only the name would incorrectly suppress injection; checking for zero-parameter
+     * methods avoids this false-positive.
      */
     private boolean methodExists(final Object classDecl, final String methodName) throws Exception {
         Object current = jcClassDeclDefs.get(classDecl);
@@ -333,12 +363,25 @@ public class JavacAstInjector {
             final Object head = listHead.get(current);
             if (head != null && jcMethodDeclClass.isInstance(head)) {
                 final Object name = jcMethodDeclName.get(head);
-                if (methodName.equals(name.toString())) return true;
+                if (methodName.equals(name.toString())) {
+                    // Only treat as a hit if this is a zero-parameter method
+                    final Object params = jcMethodDeclParams.get(head);
+                    if (params == null || params == listNil || isEmpty(params)) return true;
+                }
             }
             final Object tail = listTail.get(current);
             if (tail == null || tail == current || tail == listNil) break;
             current = tail;
         }
         return false;
+    }
+
+    /**
+     * Returns {@code true} when the given {@code com.sun.tools.javac.util.List} node has
+     * no elements (its {@code head} field is {@code null}). This is the canonical empty-list
+     * sentinel used by javac's internal linked-list type.
+     */
+    private boolean isEmpty(final Object list) throws Exception {
+        return listHead.get(list) == null;
     }
 }

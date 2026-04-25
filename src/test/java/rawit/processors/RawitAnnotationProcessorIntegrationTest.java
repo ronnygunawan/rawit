@@ -180,6 +180,31 @@ class RawitAnnotationProcessorIntegrationTest {
     }
 
     /**
+     * Compiles two source files with the annotation processor in a <em>single javac invocation</em>
+     * and returns a {@link URLClassLoader} rooted at {@code outputDir}.
+     *
+     * <p>Both sources are compiled together, so the second source can reference entry-point
+     * methods that only exist because of AST injection performed by the processor during the
+     * same compilation. This validates that injected methods are source-visible to the
+     * type-checker in a same-compilation scenario (the key requirement for Lombok-like IDE
+     * reflection).
+     */
+    private static URLClassLoader compileTwoSourcesSinglePassAndLoad(
+            final String className1, final String source1,
+            final String className2, final String source2,
+            final Path outputDir) throws Exception {
+        compileMultiple(
+                List.of(className1, className2),
+                List.of(source1, source2),
+                outputDir,
+                List.of(new RawitAnnotationProcessor()),
+                List.of("-classpath", buildClasspath(outputDir)));
+        return new URLClassLoader(
+                new URL[]{outputDir.toUri().toURL()},
+                Thread.currentThread().getContextClassLoader());
+    }
+
+    /**
      * Compiles {@code source} with the annotation processor in a <em>single pass</em> and
      * returns a {@link URLClassLoader} rooted at {@code outputDir}.
      *
@@ -998,6 +1023,52 @@ class RawitAnnotationProcessorIntegrationTest {
 
             assertEquals("Hello, World!", result,
                     "greet().name(\"World\").greeting(\"Hello\").invoke() must equal \"Hello, World!\"");
+        }
+    }
+
+    // =========================================================================
+    // AST injection source-visibility test — multi-source same javac invocation
+    // Validates that a second source file can call the AST-injected entry-point
+    // in the same compilation, proving source-level visibility (Lombok-like).
+    // =========================================================================
+
+    @Test
+    void astInjection_entryPointVisibleInSameCompilation(@TempDir final Path outputDir)
+            throws Exception {
+        // Source 1: the annotated class — processor will inject Point.constructor() into its AST
+        final String annotatedSource =
+                "package testpkg;\n" +
+                "import rawit.Constructor;\n" +
+                "public class MultiSourcePoint {\n" +
+                "    public final int x;\n" +
+                "    public final int y;\n" +
+                "    @Constructor\n" +
+                "    public MultiSourcePoint(int x, int y) { this.x = x; this.y = y; }\n" +
+                "}\n";
+
+        // Source 2: a caller that references MultiSourcePoint.constructor() in the SAME invocation.
+        // This compile succeeds only if AST injection made constructor() source-visible to javac.
+        final String callerSource =
+                "package testpkg;\n" +
+                "import testpkg.generated.MultiSourcePointConstructor;\n" +
+                "public class MultiSourceCaller {\n" +
+                "    public static MultiSourcePoint build(int x, int y) {\n" +
+                "        return MultiSourcePoint.constructor().x(x).y(y).construct();\n" +
+                "    }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader = compileTwoSourcesSinglePassAndLoad(
+                "testpkg.MultiSourcePoint", annotatedSource,
+                "testpkg.MultiSourceCaller", callerSource,
+                outputDir)) {
+            final Class<?> callerClass = loader.loadClass("testpkg.MultiSourceCaller");
+            final Object result = callerClass.getMethod("build", int.class, int.class)
+                    .invoke(null, 5, 7);
+            assertNotNull(result, "build(5,7) must return a non-null MultiSourcePoint");
+            final Class<?> pointClass = loader.loadClass("testpkg.MultiSourcePoint");
+            assertInstanceOf(pointClass, result);
+            assertEquals(5, pointClass.getField("x").get(result));
+            assertEquals(7, pointClass.getField("y").get(result));
         }
     }
 }

@@ -375,28 +375,24 @@ small extra step because the JDT Language Server rebuilds its type model from **
 not bytecode. The entry-point methods injected into `.class` files by `BytecodeInjector`
 (e.g. `Foo.constructor()`, `foo.bar()`) may not be immediately visible to JDT LS.
 
-### Instant IDE reflection — generated class entry-points
+### Instant IDE reflection — entry-points on the original class
 
-Every generated Invoker / Constructor class contains a **`public static` IDE entry-point** that
-mirrors the bytecode-injected method. Because this method is part of the generated *source* file,
-JDT LS indexes it immediately after annotation processing runs — no workspace clean required.
+When compiling with **javac**, Rawit injects entry-point methods directly into the AST of the
+original annotated class (the same technique used by Lombok). Because these methods are part of the
+source AST before type-checking completes, javac-based IDE tools such as **IntelliJ IDEA** see
+them immediately — no workspace clean required.
 
-| Annotation path | Bytecode entry-point (CLI) | Generated class entry-point (IDE) |
-|-----------------|----------------------------|-----------------------------------|
-| `@Constructor` on `Foo` | `Foo.constructor()` | `FooConstructor.constructor()` |
-| `@Invoker` on `Foo.bar()` (instance) | `foo.bar()` | `FooBarInvoker.bar(foo)` |
-| `@Invoker` on static `Foo.bar()` | `Foo.bar()` | `FooBarInvoker.bar()` |
-| `@Invoker` on constructor `Foo(int x)` | `Foo.foo()` | `FooInvoker.foo()` |
+| Annotation path | Entry-point | Notes |
+|-----------------|-------------|-------|
+| `@Constructor` on `Foo` | `Foo.constructor()` | static, returns `FooConstructor` |
+| `@Invoker` on `Foo.bar()` (instance) | `foo.bar()` | instance, returns `FooBarInvoker` |
+| `@Invoker` on static `Foo.bar()` | `Foo.bar()` | static, returns `FooBarInvoker` |
+| `@Invoker` on constructor `Foo(int x)` | `Foo.foo()` | static, returns `FooInvoker` |
 
-The two entry-points produce **identical chains** and **identical results**:
-
-```java
-// CLI / javac path (bytecode-injected entry-point)
-Point p = Point.constructor().x(1).y(2).construct();
-
-// IDE path (source-visible entry-point on generated class)
-Point p = PointConstructor.constructor().x(1).y(2).construct();
-```
+> **VS Code Java (JDT LS / ECJ):** JDT LS uses its own ECJ-based compiler and does not run the
+> javac AST injection path. The entry-point methods are still present at runtime (injected via
+> bytecode), but they may not be visible to the JDT LS type-checker without a workspace clean
+> after annotation processing completes.
 
 ### Tip: import the generated package
 

@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -129,7 +130,7 @@ public class BytecodeInjector {
             final int lastSlash = enclosingClassName.lastIndexOf('/');
             final String simpleName = lastSlash < 0 ? enclosingClassName
                     : enclosingClassName.substring(lastSlash + 1);
-            return simpleName.toLowerCase();
+            return simpleName.toLowerCase(Locale.ROOT);
         }
         return tree.group().groupName();
     }
@@ -181,6 +182,41 @@ public class BytecodeInjector {
                 .allMatch(m -> m.isConstructor());
         if (isConstructorGroup) return false;
         return tree.group().members().stream().noneMatch(m -> m.isStatic());
+    }
+
+    /**
+     * Returns the access flags (as a long suitable for javac's {@code JCModifiers}) for the
+     * entry-point method generated for the given merge tree.
+     *
+     * <p>This matches the flags used by {@link InjectionClassVisitor#resolveAccessFlags} so
+     * that both the bytecode-injection path and the AST-injection path produce identical
+     * visibility / staticness on the entry-point.
+     *
+     * <ul>
+     *   <li>{@code @Constructor} groups and {@code @Invoker} on constructors → {@code public static}</li>
+     *   <li>Static {@code @Invoker} → original visibility + {@code static}</li>
+     *   <li>Instance {@code @Invoker} → original visibility (no static)</li>
+     * </ul>
+     *
+     * @param tree the merge tree
+     * @return access flags compatible with both ASM {@code Opcodes} and javac {@code Flags}
+     */
+    public static long resolveEntryPointAccessFlags(final MergeTree tree) {
+        final boolean isConstructorAnnotationGroup = tree.group().members().stream()
+                .allMatch(m -> m.isConstructorAnnotation());
+        final boolean isConstructorGroup = tree.group().members().stream()
+                .allMatch(m -> m.isConstructor());
+        if (isConstructorAnnotationGroup || isConstructorGroup) {
+            return Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC; // 0x0001 | 0x0008
+        }
+        final boolean isStatic = tree.group().members().stream().anyMatch(m -> m.isStatic());
+        final var representative = tree.group().members().get(0);
+        final int visibilityMask = Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED;
+        long flags = representative.accessFlags() & visibilityMask;
+        if (isStatic) {
+            flags |= Opcodes.ACC_STATIC;
+        }
+        return flags;
     }
 
     private static String resolvePackagePrefix(final String binaryClassName) {

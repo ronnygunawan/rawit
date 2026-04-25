@@ -402,6 +402,7 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                 final String callerBinaryName = BytecodeInjector.resolveCallerClassBinaryName(tree);
                 final String callerFqn = callerBinaryName.replace('/', '.');
                 final boolean instanceMethod = BytecodeInjector.isInstanceEntryPoint(tree);
+                final long accessFlags = BytecodeInjector.resolveEntryPointAccessFlags(tree);
 
                 // Look up the TypeElement for the enclosing class
                 final String enclosingBinary = tree.group().enclosingClassName();
@@ -411,7 +412,8 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                 if (classElement == null) continue;
 
                 astInjector.inject(new JavacAstInjector.EntryPoint(
-                        classElement, entryPointName, callerFqn, instanceMethod, enclosingFqn));
+                        classElement, entryPointName, callerFqn, instanceMethod, enclosingFqn,
+                        accessFlags));
 
                 if (debug) {
                     messager.printMessage(Diagnostic.Kind.NOTE,
