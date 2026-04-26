@@ -69,6 +69,8 @@ javac's post-generate phase via a `TaskListener` and injects bytecode after each
 written. On non-`javac` compilers (for example, ECJ), this single-pass injection path is not
 guaranteed, so fallback behavior or additional compiler-specific configuration may be required.
 
+For VS Code Java users, see [IDE Integration](#ide-integration-vs-code-java) below.
+
 ### 2. Annotate your code
 
 ```java
@@ -363,6 +365,62 @@ Rawit catches mistakes early. You'll get a clear `javac` error for:
 | Two `@Getter` fields produce the same getter name | `getter 'name()' conflicts with another @Getter field in Class` |
 | `@Getter` field conflicts with inherited method | `getter 'name()' conflicts with inherited method from SuperClass` |
 | Incompatible return type in field-hiding override | `getter 'name()' in Derived cannot override getter in Base: incompatible return types` |
+
+---
+
+## 💡 IDE Integration (VS Code Java)
+
+Rawit is designed to work with any Java build tool, but VS Code Java (JDT LS / ECJ) requires a
+small extra step because the JDT Language Server rebuilds its type model from **source files**,
+not bytecode. The entry-point methods injected into `.class` files by `BytecodeInjector`
+(e.g. `Foo.constructor()`, `foo.bar()`) may not be immediately visible to JDT LS.
+
+### Instant IDE reflection — entry-points on the original class
+
+When compiling with **javac**, Rawit injects entry-point methods directly into the AST of the
+original annotated class (the same technique used by Lombok). Because these methods are part of the
+source AST before type-checking completes, javac-based IDE tools such as **IntelliJ IDEA** see
+them immediately — no workspace clean required.
+
+> **Note:** AST injection is best-effort. It uses reflective access to internal javac APIs and
+> will silently disable itself if those APIs are not accessible (e.g. when the required module
+> opens are missing). If you run the processor from Maven/Gradle and need the entry-points to be
+> source-visible to the type-checker, add the following JVM argument to your compiler plugin:
+>
+> ```
+> --add-opens jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+> --add-opens jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+> --add-opens jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+> --add-opens jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED
+> ```
+>
+> Even without these opens, bytecode injection still ensures the entry-points are present at runtime.
+
+| Annotation path | Entry-point | Notes |
+|-----------------|-------------|-------|
+| `@Constructor` on `Foo` | `Foo.constructor()` | static, returns `FooConstructor` |
+| `@Invoker` on `Foo.bar()` (instance) | `foo.bar()` | instance, returns `FooBarInvoker` |
+| `@Invoker` on static `Foo.bar()` | `Foo.bar()` | static, returns `FooBarInvoker` |
+| `@Invoker` on constructor `Foo(int x)` | `Foo.foo()` | static, returns `FooInvoker` |
+
+> **VS Code Java (JDT LS / ECJ):** JDT LS uses its own ECJ-based compiler and does not run the
+> javac AST injection path. The entry-point methods are still present at runtime (injected via
+> bytecode), but they may not be visible to the JDT LS type-checker without a workspace clean
+> after annotation processing completes.
+
+### Tip: import the generated package
+
+For types in a named package, generated classes live in the `generated` sub-package of the
+original package. For example, `class com.example.Point` → generated class
+`com.example.generated.PointConstructor`. For types in the default package, there is no package
+prefix, so generated classes are not placed in a `.generated` sub-package. Import the generated
+class for quick IDE completion, but call the injected entry-point on the original class:
+
+```java
+import com.example.generated.PointConstructor;
+
+Point p = Point.constructor().x(1).y(2).construct();
+```
 
 ---
 

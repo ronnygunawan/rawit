@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -94,6 +95,139 @@ public class BytecodeInjector {
                     "BytecodeInjector: unexpected error injecting into " + classFilePath
                             + " — " + e.getMessage() + ". Original .class preserved.");
         }
+    }
+
+    // =========================================================================
+    // InjectionClassVisitor
+    // =========================================================================
+
+    // -------------------------------------------------------------------------
+    // Public static helpers (shared with JavacAstInjector and tests)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the parameterless entry-point method name for a merge tree.
+     *
+     * <ul>
+     *   <li>{@code @Constructor} groups always use {@code "constructor"}.</li>
+     *   <li>{@code @Invoker} on a constructor uses the enclosing simple class name lowercased.</li>
+     *   <li>{@code @Invoker} on a method uses the method's group name.</li>
+     * </ul>
+     *
+     * @param tree the merge tree
+     * @return the entry-point method name
+     */
+    public static String resolveEntryPointName(final MergeTree tree) {
+        final boolean isConstructorAnnotationGroup = tree.group().members().stream()
+                .allMatch(m -> m.isConstructorAnnotation());
+        if (isConstructorAnnotationGroup) {
+            return "constructor";
+        }
+        final boolean isConstructorGroup = tree.group().members().stream()
+                .allMatch(m -> m.isConstructor());
+        if (isConstructorGroup) {
+            final String enclosingClassName = tree.group().enclosingClassName();
+            final int lastSlash = enclosingClassName.lastIndexOf('/');
+            final String simpleName = lastSlash < 0 ? enclosingClassName
+                    : enclosingClassName.substring(lastSlash + 1);
+            return simpleName.toLowerCase(Locale.ROOT);
+        }
+        return tree.group().groupName();
+    }
+
+    /**
+     * Returns the generated caller class binary name (slash-separated) for a merge tree.
+     *
+     * <p>Examples for enclosing class {@code com/example/Foo}:
+     * <ul>
+     *   <li>{@code @Constructor} → {@code com/example/generated/FooConstructor}</li>
+     *   <li>{@code @Invoker} on constructor → {@code com/example/generated/FooInvoker}</li>
+     *   <li>{@code @Invoker} on method {@code bar} → {@code com/example/generated/FooBarInvoker}</li>
+     * </ul>
+     *
+     * @param tree the merge tree
+     * @return the binary class name with {@code /} separators
+     */
+    public static String resolveCallerClassBinaryName(final MergeTree tree) {
+        final String enclosing = tree.group().enclosingClassName();
+        final int lastSlash = enclosing.lastIndexOf('/');
+        final String simpleName = lastSlash < 0 ? enclosing : enclosing.substring(lastSlash + 1);
+        final String packagePrefix = resolvePackagePrefix(enclosing);
+
+        final boolean isConstructorAnnotationGroup = tree.group().members().stream()
+                .allMatch(m -> m.isConstructorAnnotation());
+        if (isConstructorAnnotationGroup) {
+            return packagePrefix + simpleName + "Constructor";
+        }
+        final String groupName = tree.group().groupName();
+        if ("<init>".equals(groupName)) {
+            return packagePrefix + simpleName + "Invoker";
+        }
+        return packagePrefix + simpleName + toPascalCase(groupName) + "Invoker";
+    }
+
+    /**
+     * Returns {@code true} when the entry-point method for the given tree is an instance
+     * method (i.e. it needs a {@code this} / {@code instance} parameter to the caller
+     * constructor). This is the case for non-static {@code @Invoker} on a regular method.
+     *
+     * @param tree the merge tree
+     * @return {@code true} for instance-method entry-points
+     */
+    public static boolean isInstanceEntryPoint(final MergeTree tree) {
+        final boolean isConstructorAnnotationGroup = tree.group().members().stream()
+                .allMatch(m -> m.isConstructorAnnotation());
+        if (isConstructorAnnotationGroup) return false;
+        final boolean isConstructorGroup = tree.group().members().stream()
+                .allMatch(m -> m.isConstructor());
+        if (isConstructorGroup) return false;
+        return tree.group().members().stream().noneMatch(m -> m.isStatic());
+    }
+
+    /**
+     * Returns the access flags (as a long suitable for javac's {@code JCModifiers}) for the
+     * entry-point method generated for the given merge tree.
+     *
+     * <p>This matches the flags used by {@link InjectionClassVisitor#resolveAccessFlags} so
+     * that both the bytecode-injection path and the AST-injection path produce identical
+     * visibility / staticness on the entry-point.
+     *
+     * <ul>
+     *   <li>{@code @Constructor} groups and {@code @Invoker} on constructors → {@code public static}</li>
+     *   <li>Static {@code @Invoker} → original visibility + {@code static}</li>
+     *   <li>Instance {@code @Invoker} → original visibility (no static)</li>
+     * </ul>
+     *
+     * @param tree the merge tree
+     * @return access flags compatible with both ASM {@code Opcodes} and javac {@code Flags}
+     */
+    public static long resolveEntryPointAccessFlags(final MergeTree tree) {
+        final boolean isConstructorAnnotationGroup = tree.group().members().stream()
+                .allMatch(m -> m.isConstructorAnnotation());
+        final boolean isConstructorGroup = tree.group().members().stream()
+                .allMatch(m -> m.isConstructor());
+        if (isConstructorAnnotationGroup || isConstructorGroup) {
+            return Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC; // 0x0001 | 0x0008
+        }
+        final boolean isStatic = tree.group().members().stream().anyMatch(m -> m.isStatic());
+        final var representative = tree.group().members().get(0);
+        final int visibilityMask = Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED;
+        long flags = representative.accessFlags() & visibilityMask;
+        if (isStatic) {
+            flags |= Opcodes.ACC_STATIC;
+        }
+        return flags;
+    }
+
+    private static String resolvePackagePrefix(final String binaryClassName) {
+        final int lastSlash = binaryClassName.lastIndexOf('/');
+        if (lastSlash < 0) return "";
+        return binaryClassName.substring(0, lastSlash + 1) + "generated/";
+    }
+
+    private static String toPascalCase(final String name) {
+        if (name == null || name.isEmpty()) return name;
+        return Character.toUpperCase(name.charAt(0)) + name.substring(1);
     }
 
     // =========================================================================
@@ -212,27 +346,11 @@ public class BytecodeInjector {
         }
 
         // -------------------------------------------------------------------------
-        // Name / descriptor resolution helpers
+        // Name / descriptor resolution helpers (delegate to outer class statics)
         // -------------------------------------------------------------------------
 
         private static String resolveOverloadName(final MergeTree tree) {
-            final boolean isConstructorAnnotationGroup = tree.group().members().stream()
-                    .allMatch(m -> m.isConstructorAnnotation());
-            if (isConstructorAnnotationGroup) {
-                // @Constructor: the entry point is always named "constructor"
-                return "constructor";
-            }
-            final boolean isConstructorGroup = tree.group().members().stream()
-                    .allMatch(m -> m.isConstructor());
-            if (isConstructorGroup) {
-                // @Invoker on a constructor: the entry point is named after the class (lowercased)
-                final String enclosingClassName = tree.group().enclosingClassName();
-                final int lastSlash = enclosingClassName.lastIndexOf('/');
-                final String simpleName = lastSlash < 0 ? enclosingClassName
-                        : enclosingClassName.substring(lastSlash + 1);
-                return simpleName.toLowerCase();
-            }
-            return tree.group().groupName();
+            return BytecodeInjector.resolveEntryPointName(tree);
         }
 
         private static int resolveAccessFlags(final MergeTree tree,
@@ -256,32 +374,7 @@ public class BytecodeInjector {
         }
 
         private static String resolveCallerClassBinaryName(final MergeTree tree) {
-            final String enclosing = tree.group().enclosingClassName();
-            final int lastSlash = enclosing.lastIndexOf('/');
-            final String simpleName = lastSlash < 0 ? enclosing : enclosing.substring(lastSlash + 1);
-            final String packagePrefix = packagePrefix(enclosing);
-
-            final boolean isConstructorAnnotationGroup = tree.group().members().stream()
-                    .allMatch(m -> m.isConstructorAnnotation());
-            if (isConstructorAnnotationGroup) {
-                return packagePrefix + simpleName + "Constructor";
-            }
-            final String groupName = tree.group().groupName();
-            if ("<init>".equals(groupName)) {
-                return packagePrefix + simpleName + "Invoker";
-            }
-            return packagePrefix + simpleName + toPascalCase(groupName) + "Invoker";
-        }
-
-        private static String packagePrefix(final String binaryClassName) {
-            final int lastSlash = binaryClassName.lastIndexOf('/');
-            if (lastSlash < 0) return "";
-            return binaryClassName.substring(0, lastSlash + 1) + "generated/";
-        }
-
-        private static String toPascalCase(final String name) {
-            if (name == null || name.isEmpty()) return name;
-            return Character.toUpperCase(name.charAt(0)) + name.substring(1);
+            return BytecodeInjector.resolveCallerClassBinaryName(tree);
         }
     }
 }

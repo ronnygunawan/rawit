@@ -8,6 +8,7 @@ import rawit.processors.getter.GetterCollisionDetector;
 import rawit.processors.getter.GetterNameResolver;
 import rawit.processors.inject.BytecodeInjector;
 import rawit.processors.inject.GetterBytecodeInjector;
+import rawit.processors.inject.JavacAstInjector;
 import rawit.processors.inject.OverloadResolver;
 import rawit.processors.merge.MergeTreeBuilder;
 import rawit.processors.model.AnnotatedField;
@@ -76,6 +77,12 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
      * {@link JavacTask}, enabling single-pass deferred injection.
      */
     private boolean useTaskListener = false;
+    /**
+     * AST injector for Lombok-like IDE visibility — injects entry-point methods directly into
+     * the original class's javac AST so they are source-visible to the type-checker and
+     * javac-based IDE tools. {@code null} when not running under javac.
+     */
+    private JavacAstInjector astInjector;
 
     private Messager messager;
     private ElementValidator elementValidator;
@@ -108,6 +115,10 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
             final JavacTask javacTask = JavacTask.instance(processingEnv);
             javacTask.addTaskListener(createPostGenerateListener());
             useTaskListener = true;
+            // Also initialise the AST injector for Lombok-like source-level IDE visibility.
+            // JavacAstInjector.tryCreate() reuses the same javac context; if it fails for any
+            // reason we silently fall back to bytecode-only injection.
+            astInjector = JavacAstInjector.tryCreate(processingEnv);
         } catch (final IllegalArgumentException ignored) {
             // Not running under javac — fall back to multi-pass (expected on non-javac compilers)
         } catch (final Exception e) {
@@ -379,6 +390,38 @@ public class RawitAnnotationProcessor extends AbstractProcessor {
                     "[invoker.debug] Generating source files for " + allTrees.size() + " tree(s)");
         }
         javaPoetGenerator.generate(allTrees, processingEnv);
+
+        // --- Stage 4b: AST injection for Lombok-like IDE visibility (javac only) ---
+        // When running under javac, inject source-visible entry-point methods directly into
+        // the original class's AST. This makes Foo.constructor() / foo.bar() visible to the
+        // javac type-checker and to javac-based IDE tools (e.g. IntelliJ IDEA) without any
+        // workspace clean. Falls back silently when astInjector is null (ECJ / non-javac).
+        if (astInjector != null) {
+            for (final MergeTree tree : allTrees) {
+                final String entryPointName = BytecodeInjector.resolveEntryPointName(tree);
+                final String callerBinaryName = BytecodeInjector.resolveCallerClassBinaryName(tree);
+                final String callerFqn = callerBinaryName.replace('/', '.');
+                final boolean instanceMethod = BytecodeInjector.isInstanceEntryPoint(tree);
+                final long accessFlags = BytecodeInjector.resolveEntryPointAccessFlags(tree);
+
+                // Look up the TypeElement for the enclosing class
+                final String enclosingBinary = tree.group().enclosingClassName();
+                final String enclosingFqn = enclosingBinary.replace('/', '.').replace('$', '.');
+                final TypeElement classElement = processingEnv.getElementUtils()
+                        .getTypeElement(enclosingFqn);
+                if (classElement == null) continue;
+
+                astInjector.inject(new JavacAstInjector.EntryPoint(
+                        classElement, entryPointName, callerFqn, instanceMethod,
+                        accessFlags));
+
+                if (debug) {
+                    messager.printMessage(Diagnostic.Kind.NOTE,
+                            "[invoker.debug] AST-injected " + enclosingFqn + "." + entryPointName
+                                    + "() → " + callerFqn);
+                }
+            }
+        }
 
         // --- Stage 5: Inject parameterless overloads via ASM, once per enclosing class ---
         // When a TaskListener is registered (javac), injection is deferred until after the

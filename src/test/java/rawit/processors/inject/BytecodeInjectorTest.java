@@ -282,4 +282,126 @@ class BytecodeInjectorTest {
         assertEquals("()LFooReturnTypeBarInvoker;", descriptor,
                 "return type must be the caller class");
     }
+
+    // =========================================================================
+    // resolveEntryPointName — static helper tests
+    // =========================================================================
+
+    @Test
+    void resolveEntryPointName_constructorAnnotationGroup_returnsConstructor() {
+        final AnnotatedMethod m = new AnnotatedMethod(
+                "com/example/Foo", "<init>", false, true, true,
+                List.of(new Parameter("x", "I")), "V", List.of(), Opcodes.ACC_PUBLIC);
+        final MergeTree tree = linearTree(m);
+        assertEquals("constructor", BytecodeInjector.resolveEntryPointName(tree));
+    }
+
+    @Test
+    void resolveEntryPointName_invokerOnConstructor_returnsLowercasedSimpleName() {
+        final AnnotatedMethod m = new AnnotatedMethod(
+                "com/example/Foo", "<init>", false, true, false,
+                List.of(new Parameter("x", "I")), "V", List.of(), Opcodes.ACC_PUBLIC);
+        final MergeTree tree = linearTree(m);
+        assertEquals("foo", BytecodeInjector.resolveEntryPointName(tree));
+    }
+
+    @Test
+    void resolveEntryPointName_invokerOnConstructor_defaultPackage_returnsLowercasedSimpleName() {
+        // Enclosing class has no '/' — the "no slash" branch in resolveEntryPointName
+        final AnnotatedMethod m = new AnnotatedMethod(
+                "Foo", "<init>", false, true, false,
+                List.of(new Parameter("x", "I")), "V", List.of(), Opcodes.ACC_PUBLIC);
+        final MergeTree tree = linearTree(m);
+        assertEquals("foo", BytecodeInjector.resolveEntryPointName(tree));
+    }
+
+    @Test
+    void resolveEntryPointName_invokerOnMethod_returnsGroupName() {
+        final AnnotatedMethod m = new AnnotatedMethod(
+                "com/example/Foo", "compute", false, false,
+                List.of(new Parameter("x", "I")), "I", List.of(), Opcodes.ACC_PUBLIC);
+        final MergeTree tree = linearTree(m);
+        assertEquals("compute", BytecodeInjector.resolveEntryPointName(tree));
+    }
+
+    // =========================================================================
+    // resolveEntryPointAccessFlags — new method from this PR
+    // =========================================================================
+
+    @Test
+    void resolveEntryPointAccessFlags_constructorAnnotationGroup_returnsPublicStatic() {
+        final AnnotatedMethod m = new AnnotatedMethod(
+                "com/example/Foo", "<init>", false, true, true,
+                List.of(new Parameter("x", "I")), "V", List.of(), Opcodes.ACC_PUBLIC);
+        final MergeTree tree = linearTree(m);
+        final long flags = BytecodeInjector.resolveEntryPointAccessFlags(tree);
+        assertEquals(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, flags);
+    }
+
+    @Test
+    void resolveEntryPointAccessFlags_invokerOnConstructor_returnsPublicStatic() {
+        // @Invoker on constructor (isConstructorGroup=true, isConstructorAnnotation=false)
+        final AnnotatedMethod m = new AnnotatedMethod(
+                "com/example/Foo", "<init>", false, true, false,
+                List.of(new Parameter("x", "I")), "V", List.of(), Opcodes.ACC_PUBLIC);
+        final MergeTree tree = linearTree(m);
+        final long flags = BytecodeInjector.resolveEntryPointAccessFlags(tree);
+        assertEquals(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, flags);
+    }
+
+    @Test
+    void resolveEntryPointAccessFlags_staticInvokerMethod_returnsPublicStatic() {
+        final AnnotatedMethod m = new AnnotatedMethod(
+                "com/example/Foo", "compute", true, false,
+                List.of(new Parameter("x", "I")), "I", List.of(),
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC);
+        final MergeTree tree = linearTree(m);
+        final long flags = BytecodeInjector.resolveEntryPointAccessFlags(tree);
+        assertTrue((flags & Opcodes.ACC_STATIC) != 0, "static invoker must produce static entry-point");
+        assertTrue((flags & Opcodes.ACC_PUBLIC) != 0, "static public invoker must produce public entry-point");
+    }
+
+    @Test
+    void resolveEntryPointAccessFlags_instanceInvokerMethod_returnsPublicNoStatic() {
+        final AnnotatedMethod m = new AnnotatedMethod(
+                "com/example/Foo", "bar", false, false,
+                List.of(new Parameter("x", "I")), "I", List.of(), Opcodes.ACC_PUBLIC);
+        final MergeTree tree = linearTree(m);
+        final long flags = BytecodeInjector.resolveEntryPointAccessFlags(tree);
+        assertTrue((flags & Opcodes.ACC_PUBLIC) != 0, "public invoker must produce public entry-point");
+        assertEquals(0, flags & Opcodes.ACC_STATIC, "instance invoker must not be static");
+    }
+
+    @Test
+    void resolveEntryPointAccessFlags_packagePrivateInstanceInvoker_returnsNoPublicNoStatic() {
+        // Package-private invoker: accessFlags=0
+        final AnnotatedMethod m = new AnnotatedMethod(
+                "com/example/Foo", "bar", false, false,
+                List.of(new Parameter("x", "I")), "I", List.of(), 0);
+        final MergeTree tree = linearTree(m);
+        final long flags = BytecodeInjector.resolveEntryPointAccessFlags(tree);
+        assertEquals(0, flags & Opcodes.ACC_PUBLIC, "package-private invoker must not be public");
+        assertEquals(0, flags & Opcodes.ACC_STATIC, "package-private invoker must not be static");
+    }
+
+    // =========================================================================
+    // inject — error-path coverage (invalid class files)
+    // =========================================================================
+
+    @Test
+    void inject_emitsErrorWhenClassFileIsInvalidBytecode(@TempDir final Path tempDir) throws Exception {
+        final AnnotatedMethod method = new AnnotatedMethod(
+                "FooDir", "bar", false, false,
+                List.of(new Parameter("x", "I")), "I", List.of(), Opcodes.ACC_PUBLIC);
+
+        // Write a regular file with invalid contents so injection fails while reading/parsing bytecode.
+        final Path badClassFile = tempDir.resolve("BadClass.class");
+        java.nio.file.Files.writeString(badClassFile, "not valid bytecode");
+
+        final List<String> notes = new ArrayList<>();
+        final List<String> errors = new ArrayList<>();
+        new BytecodeInjector().inject(badClassFile, List.of(linearTree(method)), mockEnv(notes, errors));
+
+        assertFalse(errors.isEmpty(), "must emit ERROR for invalid class file");
+    }
 }

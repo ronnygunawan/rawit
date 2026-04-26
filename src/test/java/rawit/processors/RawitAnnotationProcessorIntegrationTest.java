@@ -180,6 +180,31 @@ class RawitAnnotationProcessorIntegrationTest {
     }
 
     /**
+     * Compiles two source files with the annotation processor in a <em>single javac invocation</em>
+     * and returns a {@link URLClassLoader} rooted at {@code outputDir}.
+     *
+     * <p>Both sources are compiled together, so the second source can reference entry-point
+     * methods that only exist because of AST injection performed by the processor during the
+     * same compilation. This validates that injected methods are source-visible to the
+     * type-checker in a same-compilation scenario (the key requirement for Lombok-like IDE
+     * reflection).
+     */
+    private static URLClassLoader compileTwoSourcesSinglePassAndLoad(
+            final String className1, final String source1,
+            final String className2, final String source2,
+            final Path outputDir) throws Exception {
+        compileMultiple(
+                List.of(className1, className2),
+                List.of(source1, source2),
+                outputDir,
+                List.of(new RawitAnnotationProcessor()),
+                List.of("-classpath", buildClasspath(outputDir)));
+        return new URLClassLoader(
+                new URL[]{outputDir.toUri().toURL()},
+                Thread.currentThread().getContextClassLoader());
+    }
+
+    /**
      * Compiles {@code source} with the annotation processor in a <em>single pass</em> and
      * returns a {@link URLClassLoader} rooted at {@code outputDir}.
      *
@@ -878,6 +903,334 @@ class RawitAnnotationProcessorIntegrationTest {
                     "single-pass: getName() must return 'Alice'");
             assertEquals(30, cls.getMethod("getAge").invoke(obj),
                     "single-pass: getAge() must return 30");
+        }
+    }
+
+    // =========================================================================
+    // AST injection tests — entry-point visible on the ORIGINAL class (Lombok-like)
+    // These tests verify that after a single-pass compile with the processor,
+    // the entry-point method (e.g. Foo.constructor(), Foo.bar()) is present
+    // directly on the ORIGINAL annotated class, not just on the generated class.
+    // Validates: issue "Lombok-like instant IDE reflection for generated APIs"
+    // =========================================================================
+
+    @Test
+    void astInjection_constructorAnnotation_entryPointOnOriginalClass(@TempDir final Path outputDir)
+            throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Constructor;\n" +
+                "public class AstCtorFoo {\n" +
+                "    public final int x;\n" +
+                "    public final int y;\n" +
+                "    @Constructor\n" +
+                "    public AstCtorFoo(int x, int y) { this.x = x; this.y = y; }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader =
+                     compileSinglePassAndLoad("testpkg.AstCtorFoo", source, outputDir)) {
+            final Class<?> cls = loader.loadClass("testpkg.AstCtorFoo");
+
+            // The entry-point method "constructor()" must exist on the ORIGINAL class
+            // (injected via javac AST injection, not on a separate generated class)
+            java.lang.reflect.Method constructor = cls.getMethod("constructor");
+            assertNotNull(constructor,
+                    "constructor() must be visible on the original class AstCtorFoo");
+            assertTrue(java.lang.reflect.Modifier.isStatic(constructor.getModifiers()),
+                    "constructor() must be static");
+            assertTrue(java.lang.reflect.Modifier.isPublic(constructor.getModifiers()),
+                    "constructor() must be public");
+
+            // Exercise the chain: AstCtorFoo.constructor().x(3).y(7).construct()
+            final Object constructorStage = constructor.invoke(null);
+            final Object xStage = invokeInt(constructorStage, "x", 3);
+            final Object constructStage = invokeInt(xStage, "y", 7);
+            final Object instance = invoke(constructStage, "construct");
+
+            assertNotNull(instance);
+            assertInstanceOf(cls, instance);
+            assertEquals(3, cls.getField("x").get(instance));
+            assertEquals(7, cls.getField("y").get(instance));
+        }
+    }
+
+    @Test
+    void astInjection_instanceInvoker_entryPointOnOriginalClass(@TempDir final Path outputDir)
+            throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class AstInvFoo {\n" +
+                "    @Invoker\n" +
+                "    public int multiply(int x, int y) { return x * y; }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader =
+                     compileSinglePassAndLoad("testpkg.AstInvFoo", source, outputDir)) {
+            final Class<?> cls = loader.loadClass("testpkg.AstInvFoo");
+
+            // The entry-point method "multiply()" must exist on the ORIGINAL class
+            java.lang.reflect.Method multiply = cls.getMethod("multiply");
+            assertNotNull(multiply,
+                    "multiply() must be visible on the original class AstInvFoo");
+            assertFalse(java.lang.reflect.Modifier.isStatic(multiply.getModifiers()),
+                    "instance @Invoker entry-point must NOT be static");
+            assertTrue(java.lang.reflect.Modifier.isPublic(multiply.getModifiers()),
+                    "multiply() must be public");
+
+            // Exercise via chain: new AstInvFoo().multiply().x(3).y(4).invoke() == 12
+            final Object foo = cls.getDeclaredConstructor().newInstance();
+            final Object multiplyStage = multiply.invoke(foo);
+            final Object xStage = invokeInt(multiplyStage, "x", 3);
+            final Object resultStage = invokeInt(xStage, "y", 4);
+            final Object result = invoke(resultStage, "invoke");
+
+            assertEquals(12, result, "multiply().x(3).y(4).invoke() must equal 3*4=12");
+        }
+    }
+
+    @Test
+    void astInjection_staticInvoker_entryPointOnOriginalClass(@TempDir final Path outputDir)
+            throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class AstStaticFoo {\n" +
+                "    @Invoker\n" +
+                "    public static String greet(String name, String greeting) {\n" +
+                "        return greeting + \", \" + name + \"!\";\n" +
+                "    }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader =
+                     compileSinglePassAndLoad("testpkg.AstStaticFoo", source, outputDir)) {
+            final Class<?> cls = loader.loadClass("testpkg.AstStaticFoo");
+
+            // The entry-point method "greet()" must exist on the ORIGINAL class
+            java.lang.reflect.Method greet = cls.getMethod("greet");
+            assertNotNull(greet,
+                    "greet() must be visible on the original class AstStaticFoo");
+            assertTrue(java.lang.reflect.Modifier.isStatic(greet.getModifiers()),
+                    "static @Invoker entry-point must be static");
+            assertTrue(java.lang.reflect.Modifier.isPublic(greet.getModifiers()),
+                    "greet() must be public");
+
+            // Exercise via chain: AstStaticFoo.greet().name("World").greeting("Hello").invoke()
+            final Object greetStage = greet.invoke(null);
+            final Object nameStage = invokeString(greetStage, "name", "World");
+            final Object resultStage = invokeString(nameStage, "greeting", "Hello");
+            final Object result = invoke(resultStage, "invoke");
+
+            assertEquals("Hello, World!", result,
+                    "greet().name(\"World\").greeting(\"Hello\").invoke() must equal \"Hello, World!\"");
+        }
+    }
+
+    // =========================================================================
+    // AST injection source-visibility test — multi-source same javac invocation
+    // Validates that a second source file can call the AST-injected entry-point
+    // in the same compilation, proving source-level visibility (Lombok-like).
+    // =========================================================================
+
+    @Test
+    void astInjection_entryPointVisibleInSameCompilation(@TempDir final Path outputDir)
+            throws Exception {
+        // Source 1: the annotated class — processor will inject Point.constructor() into its AST
+        final String annotatedSource =
+                "package testpkg;\n" +
+                "import rawit.Constructor;\n" +
+                "public class MultiSourcePoint {\n" +
+                "    public final int x;\n" +
+                "    public final int y;\n" +
+                "    @Constructor\n" +
+                "    public MultiSourcePoint(int x, int y) { this.x = x; this.y = y; }\n" +
+                "}\n";
+
+        // Source 2: a caller that references MultiSourcePoint.constructor() in the SAME invocation.
+        // This compile succeeds only if AST injection made constructor() source-visible to javac.
+        final String callerSource =
+                "package testpkg;\n" +
+                "import testpkg.generated.MultiSourcePointConstructor;\n" +
+                "public class MultiSourceCaller {\n" +
+                "    public static MultiSourcePoint build(int x, int y) {\n" +
+                "        return MultiSourcePoint.constructor().x(x).y(y).construct();\n" +
+                "    }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader = compileTwoSourcesSinglePassAndLoad(
+                "testpkg.MultiSourcePoint", annotatedSource,
+                "testpkg.MultiSourceCaller", callerSource,
+                outputDir)) {
+            final Class<?> callerClass = loader.loadClass("testpkg.MultiSourceCaller");
+            final Object result = callerClass.getMethod("build", int.class, int.class)
+                    .invoke(null, 5, 7);
+            assertNotNull(result, "build(5,7) must return a non-null MultiSourcePoint");
+            final Class<?> pointClass = loader.loadClass("testpkg.MultiSourcePoint");
+            assertInstanceOf(pointClass, result);
+            assertEquals(5, pointClass.getField("x").get(result));
+            assertEquals(7, pointClass.getField("y").get(result));
+        }
+    }
+
+    /**
+     * Multi-source same-compilation visibility — instance {@code @Invoker}.
+     *
+     * <p>A second source file calls the instance entry-point (e.g. {@code new Foo().mul()}) in
+     * the same javac invocation as the annotated class.  The compilation succeeds only when AST
+     * injection makes the entry-point source-visible to the type-checker.
+     */
+    @Test
+    void astInjection_instanceInvokerEntryPointVisibleInSameCompilation(
+            @TempDir final Path outputDir) throws Exception {
+        final String annotatedSource =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class MultiSourceMath {\n" +
+                "    @Invoker\n" +
+                "    public int multiply(int a, int b) { return a * b; }\n" +
+                "}\n";
+
+        // The caller references new MultiSourceMath().multiply() — only source-visible if AST
+        // injection ran in the same invocation.
+        final String callerSource =
+                "package testpkg;\n" +
+                "import testpkg.generated.MultiSourceMathMultiplyInvoker;\n" +
+                "public class MultiSourceMathCaller {\n" +
+                "    public static int compute(int a, int b) {\n" +
+                "        return new MultiSourceMath().multiply().a(a).b(b).invoke();\n" +
+                "    }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader = compileTwoSourcesSinglePassAndLoad(
+                "testpkg.MultiSourceMath", annotatedSource,
+                "testpkg.MultiSourceMathCaller", callerSource,
+                outputDir)) {
+            final Class<?> callerClass = loader.loadClass("testpkg.MultiSourceMathCaller");
+            final Object result = callerClass.getMethod("compute", int.class, int.class)
+                    .invoke(null, 3, 4);
+            assertEquals(12, result, "compute(3,4) must equal 3*4=12");
+        }
+    }
+
+    /**
+     * Multi-source same-compilation visibility — static {@code @Invoker}.
+     *
+     * <p>A second source file calls the static entry-point (e.g. {@code Foo.greet()}) in the
+     * same javac invocation as the annotated class.  The compilation succeeds only when AST
+     * injection makes the entry-point source-visible to the type-checker.
+     */
+    @Test
+    void astInjection_staticInvokerEntryPointVisibleInSameCompilation(
+            @TempDir final Path outputDir) throws Exception {
+        final String annotatedSource =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class MultiSourceGreeter {\n" +
+                "    @Invoker\n" +
+                "    public static String greet(String name, String greeting) {\n" +
+                "        return greeting + \", \" + name + \"!\";\n" +
+                "    }\n" +
+                "}\n";
+
+        // The caller references MultiSourceGreeter.greet() — only source-visible if AST
+        // injection ran in the same invocation.
+        final String callerSource =
+                "package testpkg;\n" +
+                "import testpkg.generated.MultiSourceGreeterGreetInvoker;\n" +
+                "public class MultiSourceGreeterCaller {\n" +
+                "    public static String say(String name, String greeting) {\n" +
+                "        return MultiSourceGreeter.greet().name(name).greeting(greeting).invoke();\n" +
+                "    }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader = compileTwoSourcesSinglePassAndLoad(
+                "testpkg.MultiSourceGreeter", annotatedSource,
+                "testpkg.MultiSourceGreeterCaller", callerSource,
+                outputDir)) {
+            final Class<?> callerClass = loader.loadClass("testpkg.MultiSourceGreeterCaller");
+            final Object result = callerClass.getMethod("say", String.class, String.class)
+                    .invoke(null, "World", "Hello");
+            assertEquals("Hello, World!", result,
+                    "say(\"World\",\"Hello\") must equal \"Hello, World!\"");
+        }
+    }
+
+    // =========================================================================
+    // Coverage: toInternalName — methods with checked exceptions
+    // =========================================================================
+
+    /**
+     * Covers {@code RawitAnnotationProcessor.toInternalName}: the processor must build a valid
+     * {@link rawit.processors.model.AnnotatedMethod} for a method that declares checked exceptions.
+     *
+     * <p>This exercises the {@code DeclaredType} branch of {@code toInternalName} (the main
+     * uncovered path in the method).
+     */
+    @Test
+    void process_methodWithCheckedExceptions_generatesInvokerWithoutError(
+            @TempDir final Path outputDir) throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class ThrowingFoo {\n" +
+                "    @Invoker\n" +
+                "    public int riskyOp(int x) throws java.io.IOException {\n" +
+                "        if (x < 0) throw new java.io.IOException(\"negative\");\n" +
+                "        return x * 2;\n" +
+                "    }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader =
+                     compileSinglePassAndLoad("testpkg.ThrowingFoo", source, outputDir)) {
+            // The entry-point must be present on the original class
+            final Class<?> cls = loader.loadClass("testpkg.ThrowingFoo");
+            final java.lang.reflect.Method entry = cls.getMethod("riskyOp");
+            assertNotNull(entry, "riskyOp() must be injected on ThrowingFoo");
+            assertEquals(0, entry.getParameterCount());
+        }
+    }
+
+    // =========================================================================
+    // Coverage: debug mode (invoker.debug=true)
+    // =========================================================================
+
+    /**
+     * Compiles with {@code -Ainvoker.debug=true} and verifies the compilation succeeds.
+     * This exercises the debug NOTE-emission branches in {@link RawitAnnotationProcessor#process}.
+     */
+    @Test
+    void process_debugMode_compilesSuccessfully(@TempDir final Path outputDir) throws Exception {
+        final String source =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class DebugFoo {\n" +
+                "    @Invoker\n" +
+                "    public int add(int x, int y) { return x + y; }\n" +
+                "}\n";
+
+        final DiagnosticCollector<JavaFileObject> collector = new DiagnosticCollector<>();
+        final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        assertNotNull(compiler, "JavaCompiler not available");
+        try (final StandardJavaFileManager fm =
+                     compiler.getStandardFileManager(collector, null, null)) {
+            fm.setLocation(StandardLocation.CLASS_OUTPUT, List.of(outputDir.toFile()));
+            fm.setLocation(StandardLocation.SOURCE_OUTPUT, List.of(outputDir.toFile()));
+            final JavaFileObject fo = new SimpleJavaFileObject(
+                    URI.create("string:///testpkg/DebugFoo.java"),
+                    JavaFileObject.Kind.SOURCE) {
+                @Override public CharSequence getCharContent(boolean ig) { return source; }
+            };
+            final JavaCompiler.CompilationTask task = compiler.getTask(
+                    null, fm, collector,
+                    List.of("-classpath", buildClasspath(outputDir),
+                            "-Ainvoker.debug=true"),
+                    null, List.of(fo));
+            task.setProcessors(List.of(new RawitAnnotationProcessor()));
+            final boolean ok = task.call();
+            final boolean hasError = collector.getDiagnostics().stream()
+                    .anyMatch(d -> d.getKind() == Diagnostic.Kind.ERROR);
+            assertFalse(hasError, "debug mode must not emit errors");
+            assertTrue(ok, "compilation must succeed in debug mode");
         }
     }
 }
