@@ -3,7 +3,6 @@ package rawit.processors.inject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.objectweb.asm.*;
-import rawit.processors.inject.BytecodeInjector;
 import rawit.processors.model.*;
 import rawit.processors.model.MergeNode.*;
 

@@ -137,7 +137,6 @@ public class JavacAstInjector {
             final Class<?> jcBlockClass = Class.forName("com.sun.tools.javac.tree.JCTree$JCBlock");
             final Class<?> jcClassDeclClass = Class.forName("com.sun.tools.javac.tree.JCTree$JCClassDecl");
             final Class<?> jcMethodDeclClass = Class.forName("com.sun.tools.javac.tree.JCTree$JCMethodDecl");
-            final Class<?> jcTreeClass = Class.forName("com.sun.tools.javac.tree.JCTree");
             final Class<?> listClass = Class.forName("com.sun.tools.javac.util.List");
 
             // Instantiate TreeMaker and Names via static factory methods
@@ -305,9 +304,9 @@ public class JavacAstInjector {
      * Finds and invokes the static {@code instance(Context)} factory method on an internal
      * javac class (e.g. {@code TreeMaker.instance(context)}).
      * <p>
-     * We iterate declared methods because the exact parameter type is the internal
-     * {@code Context} class — doing an exact getMethod() lookup requires the class object,
-     * which we may or may not have under the right classloader.
+     * We iterate all public methods (including inherited ones) because the exact parameter
+     * type is the internal {@code Context} class — doing an exact {@code getMethod()} lookup
+     * requires the class object, which we may or may not have under the right classloader.
      */
     private static Object findStaticInstance(
             final Class<?> targetClass, final Class<?> contextClass, final Object context) {
