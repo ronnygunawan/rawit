@@ -336,7 +336,7 @@ class BytecodeInjectorTest {
                 List.of(new Parameter("x", "I")), "V", List.of(), Opcodes.ACC_PUBLIC);
         final MergeTree tree = linearTree(m);
         final long flags = BytecodeInjector.resolveEntryPointAccessFlags(tree);
-        assertEquals(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, (int) flags);
+        assertEquals(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, flags);
     }
 
     @Test
@@ -347,7 +347,7 @@ class BytecodeInjectorTest {
                 List.of(new Parameter("x", "I")), "V", List.of(), Opcodes.ACC_PUBLIC);
         final MergeTree tree = linearTree(m);
         final long flags = BytecodeInjector.resolveEntryPointAccessFlags(tree);
-        assertEquals(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, (int) flags);
+        assertEquals(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, flags);
     }
 
     @Test
