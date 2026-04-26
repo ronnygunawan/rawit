@@ -1072,6 +1072,89 @@ class RawitAnnotationProcessorIntegrationTest {
         }
     }
 
+    /**
+     * Multi-source same-compilation visibility — instance {@code @Invoker}.
+     *
+     * <p>A second source file calls the instance entry-point (e.g. {@code new Foo().mul()}) in
+     * the same javac invocation as the annotated class.  The compilation succeeds only when AST
+     * injection makes the entry-point source-visible to the type-checker.
+     */
+    @Test
+    void astInjection_instanceInvokerEntryPointVisibleInSameCompilation(
+            @TempDir final Path outputDir) throws Exception {
+        final String annotatedSource =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class MultiSourceMath {\n" +
+                "    @Invoker\n" +
+                "    public int multiply(int a, int b) { return a * b; }\n" +
+                "}\n";
+
+        // The caller references new MultiSourceMath().multiply() — only source-visible if AST
+        // injection ran in the same invocation.
+        final String callerSource =
+                "package testpkg;\n" +
+                "import testpkg.generated.MultiSourceMathMultiplyInvoker;\n" +
+                "public class MultiSourceMathCaller {\n" +
+                "    public static int compute(int a, int b) {\n" +
+                "        return new MultiSourceMath().multiply().a(a).b(b).invoke();\n" +
+                "    }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader = compileTwoSourcesSinglePassAndLoad(
+                "testpkg.MultiSourceMath", annotatedSource,
+                "testpkg.MultiSourceMathCaller", callerSource,
+                outputDir)) {
+            final Class<?> callerClass = loader.loadClass("testpkg.MultiSourceMathCaller");
+            final Object result = callerClass.getMethod("compute", int.class, int.class)
+                    .invoke(null, 3, 4);
+            assertEquals(12, result, "compute(3,4) must equal 3*4=12");
+        }
+    }
+
+    /**
+     * Multi-source same-compilation visibility — static {@code @Invoker}.
+     *
+     * <p>A second source file calls the static entry-point (e.g. {@code Foo.greet()}) in the
+     * same javac invocation as the annotated class.  The compilation succeeds only when AST
+     * injection makes the entry-point source-visible to the type-checker.
+     */
+    @Test
+    void astInjection_staticInvokerEntryPointVisibleInSameCompilation(
+            @TempDir final Path outputDir) throws Exception {
+        final String annotatedSource =
+                "package testpkg;\n" +
+                "import rawit.Invoker;\n" +
+                "public class MultiSourceGreeter {\n" +
+                "    @Invoker\n" +
+                "    public static String greet(String name, String greeting) {\n" +
+                "        return greeting + \", \" + name + \"!\";\n" +
+                "    }\n" +
+                "}\n";
+
+        // The caller references MultiSourceGreeter.greet() — only source-visible if AST
+        // injection ran in the same invocation.
+        final String callerSource =
+                "package testpkg;\n" +
+                "import testpkg.generated.MultiSourceGreeterGreetInvoker;\n" +
+                "public class MultiSourceGreeterCaller {\n" +
+                "    public static String say(String name, String greeting) {\n" +
+                "        return MultiSourceGreeter.greet().name(name).greeting(greeting).invoke();\n" +
+                "    }\n" +
+                "}\n";
+
+        try (final URLClassLoader loader = compileTwoSourcesSinglePassAndLoad(
+                "testpkg.MultiSourceGreeter", annotatedSource,
+                "testpkg.MultiSourceGreeterCaller", callerSource,
+                outputDir)) {
+            final Class<?> callerClass = loader.loadClass("testpkg.MultiSourceGreeterCaller");
+            final Object result = callerClass.getMethod("say", String.class, String.class)
+                    .invoke(null, "World", "Hello");
+            assertEquals("Hello, World!", result,
+                    "say(\"World\",\"Hello\") must equal \"Hello, World!\"");
+        }
+    }
+
     // =========================================================================
     // Coverage: toInternalName — methods with checked exceptions
     // =========================================================================

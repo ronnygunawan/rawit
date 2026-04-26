@@ -382,6 +382,19 @@ original annotated class (the same technique used by Lombok). Because these meth
 source AST before type-checking completes, javac-based IDE tools such as **IntelliJ IDEA** see
 them immediately — no workspace clean required.
 
+> **Note:** AST injection is best-effort. It uses reflective access to internal javac APIs and
+> will silently disable itself if those APIs are not accessible (e.g. when the required module
+> opens are missing). If you run the processor from Maven/Gradle and need the entry-points to be
+> source-visible to the type-checker, add the following JVM argument to your compiler plugin:
+>
+> ```
+> --add-opens jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED
+> --add-opens jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+> --add-opens jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+> ```
+>
+> Even without these opens, bytecode injection still ensures the entry-points are present at runtime.
+
 | Annotation path | Entry-point | Notes |
 |-----------------|-------------|-------|
 | `@Constructor` on `Foo` | `Foo.constructor()` | static, returns `FooConstructor` |
