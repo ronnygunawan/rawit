@@ -386,19 +386,16 @@ class BytecodeInjectorTest {
     }
 
     // =========================================================================
-    // inject — error-path coverage (write failures)
+    // inject — error-path coverage (invalid class files)
     // =========================================================================
 
     @Test
-    void inject_emitsErrorWhenClassFileIsDirectory(@TempDir final Path tempDir) throws Exception {
-        // Use a directory path where a .class file is expected — write will fail
-        final Path dirAsClassFile = tempDir; // directory, not a file
-
+    void inject_emitsErrorWhenClassFileIsInvalidBytecode(@TempDir final Path tempDir) throws Exception {
         final AnnotatedMethod method = new AnnotatedMethod(
                 "FooDir", "bar", false, false,
                 List.of(new Parameter("x", "I")), "I", List.of(), Opcodes.ACC_PUBLIC);
 
-        // We can't inject into a directory path. Simulate by writing an invalid class file.
+        // Write a regular file with invalid contents so injection fails while reading/parsing bytecode.
         final Path badClassFile = tempDir.resolve("BadClass.class");
         java.nio.file.Files.writeString(badClassFile, "not valid bytecode");
 

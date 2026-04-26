@@ -396,14 +396,16 @@ them immediately — no workspace clean required.
 
 ### Tip: import the generated package
 
-Generated classes live in the `generated` sub-package of the original class. For example,
-`class com.example.Point` → generated class `com.example.generated.PointConstructor`. Import the
-generated package for quick IDE completion:
+For types in a named package, generated classes live in the `generated` sub-package of the
+original package. For example, `class com.example.Point` → generated class
+`com.example.generated.PointConstructor`. For types in the default package, there is no package
+prefix, so generated classes are not placed in a `.generated` sub-package. Import the generated
+class for quick IDE completion, but call the injected entry-point on the original class:
 
 ```java
 import com.example.generated.PointConstructor;
 
-Point p = PointConstructor.constructor().x(1).y(2).construct();
+Point p = Point.constructor().x(1).y(2).construct();
 ```
 
 ---

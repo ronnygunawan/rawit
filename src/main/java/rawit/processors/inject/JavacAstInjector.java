@@ -233,8 +233,9 @@ public class JavacAstInjector {
      * Injects an entry-point method into the original annotated class for source-level
      * IDE visibility.
      *
-     * <p>For non-static cases ({@code @Constructor}, static {@code @Invoker}): injects a
-     * {@code public static} method with no parameters.<br>
+     * <p>For static entry-point cases ({@code @Constructor}, static {@code @Invoker},
+     * {@code @Invoker} on a constructor): injects a {@code public static} method with no
+     * parameters.<br>
      * For instance {@code @Invoker}: injects a {@code public} (non-static) instance method
      * with no parameters, whose body calls {@code return new CallerClass(this)}.
      *
